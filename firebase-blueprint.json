@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "users": {
+      "path": "users/{userId}",
+      "schema": {
+        "email": "string",
+        "displayName": "string",
+        "createdAt": "string"
+      },
+      "subcollections": {
+        "categories": {
+          "path": "users/{userId}/categories/{categoryId}",
+          "schema": {
+            "id": "string",
+            "nombre": "string",
+            "archived": "boolean",
+            "createdAt": "string"
+          }
+        },
+        "products": {
+          "path": "users/{userId}/products/{productId}",
+          "schema": {
+            "id": "string",
+            "nombre": "string",
+            "categoriaId": "string",
+            "descripcion": "string?",
+            "sku": "string?",
+            "precioSugerido": "number?",
+            "stockMinimo": "number",
+            "imagen": "string?",
+            "archivado": "boolean",
+            "createdAt": "string"
+          }
+        },
+        "batches": {
+          "path": "users/{userId}/batches/{batchId}",
+          "schema": {
+            "id": "string",
+            "productoId": "string",
+            "cantidadComprada": "number",
+            "cantidadDisponible": "number",
+            "costoProductoUnitarioMXN": "number",
+            "costoProductosMXN": "number",
+            "gastosDeCompra": "array",
+            "costoTotalMXN": "number",
+            "costoUnitarioRealMXN": "number",
+            "fecha": "string",
+            "proveedor": "string?",
+            "notas": "string?",
+            "esInventarioInicial": "boolean",
+            "locked": "boolean",
+            "createdAt": "string"
+          }
+        },
+        "sales": {
+          "path": "users/{userId}/sales/{saleId}",
+          "schema": {
+            "id": "string",
+            "productoId": "string",
+            "cantidad": "number",
+            "precioVentaUnitarioMXN": "number",
+            "ingresoTotalMXN": "number",
+            "asignacionesLotes": "array",
+            "costoUnidadesVendidasMXN": "number",
+            "gastosDeVenta": "array",
+            "gastosDeVentaTotalMXN": "number",
+            "gananciaVentaMXN": "number",
+            "margenPorcentaje": "number",
+            "fecha": "string",
+            "metodoAsignacion": "string",
+            "estado": "string",
+            "notas": "string?",
+            "createdAt": "string"
+          }
+        },
+        "expenses": {
+          "path": "users/{userId}/expenses/{expenseId}",
+          "schema": {
+            "id": "string",
+            "concepto": "string",
+            "categoria": "string",
+            "montoMXN": "number",
+            "fecha": "string",
+            "esRecurrente": "boolean",
+            "notas": "string?",
+            "createdAt": "string"
+          }
+        },
+        "adjustments": {
+          "path": "users/{userId}/adjustments/{adjustmentId}",
+          "schema": {
+            "id": "string",
+            "productoId": "string",
+            "loteId": "string",
+            "cantidad": "number",
+            "tipoMotivo": "string",
+            "costoUnitarioSnapshotMXN": "number",
+            "perdidaTotalMXN": "number",
+            "fecha": "string",
+            "notas": "string?",
+            "createdAt": "string"
+          }
+        },
+        "settings": {
+          "path": "users/{userId}/settings/config",
+          "schema": {
+            "businessName": "string",
+            "displayCurrency": "string",
+            "exchangeRate": "number",
+            "inventoryViewMode": "string",
+            "defaultMinStock": "number",
+            "timeZone": "string"
+          }
+        }
+      }
+    }
+  }
+}

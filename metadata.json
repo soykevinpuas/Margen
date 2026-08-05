@@ -1,0 +1,6 @@
+{
+  "name": "Margen",
+  "description": "Aplicación profesional para vendedores y revendedores independientes (libros, ropa, tenis, perfumes, supermercado, etc.). Captura compras, calcula costos reales, asigna lotes FIFO, registra ventas con margen instantáneo y analiza la utilidad real del negocio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

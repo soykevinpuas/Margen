@@ -1,0 +1,26 @@
+{
+  "short_name": "Margen",
+  "name": "Margen - Control de Inventario FIFO",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "/",
+  "start_url": "/",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "description": "Control de Inventario, Lotes FIFO y Cálculo de Márgenes de Ganancia Real"
+}
