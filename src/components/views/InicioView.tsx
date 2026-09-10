@@ -89,12 +89,13 @@ export const InicioView: React.FC<InicioViewProps> = ({
   const getProfitChartData = (): ChartDataPoint[] => {
     const now = new Date();
     if (profitChartPeriod === 'dia') {
-      return Array.from({ length: 7 }).map((_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - i), 12, 0, 0);
+      // Últimos 30 días: índice 0 = HOY (izquierda), índice 29 = más antiguo (derecha)
+      return Array.from({ length: 30 }).map((_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 12, 0, 0);
         const dayLetter = d.toLocaleDateString('es-ES', { weekday: 'narrow' }).toUpperCase();
         const dayNum = String(d.getDate()).padStart(2, '0');
         const monthNum = String(d.getMonth() + 1).padStart(2, '0');
-        const isToday = i === 6;
+        const isToday = i === 0;
         const label = isToday ? `Hoy (${dayNum}/${monthNum})` : `${dayLetter} ${dayNum}/${monthNum}`;
         const dateStr = getLocalDateKey(d);
 
@@ -330,6 +331,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                 showLegend={true}
                 selectedIndex={profitSelectedIndex}
                 onSelectPoint={(idx) => setProfitSelectedIndex(idx)}
+                scrollableDays={profitChartPeriod === 'dia' && chartType === 'barras'}
               />
 
               <button

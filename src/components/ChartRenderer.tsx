@@ -18,6 +18,8 @@ interface ChartRendererProps {
   showLegend?: boolean;
   selectedIndex?: number | null;
   onSelectPoint?: (index: number | null) => void;
+  // Modo 30 días: scroll horizontal con snap por barra
+  scrollableDays?: boolean;
 }
 
 export const ChartRenderer: React.FC<ChartRendererProps> = ({
@@ -29,6 +31,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
   showLegend = true,
   selectedIndex = null,
   onSelectPoint,
+  scrollableDays = false,
 }) => {
   const totalIngresos = data.reduce((acc, d) => acc + d.ingresos, 0);
   const totalGastos = data.reduce((acc, d) => acc + d.gastos, 0);
@@ -62,7 +65,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
     <div className="w-full flex flex-col gap-3">
       {/* GRAPH RENDER AREA */}
       <div
-        className="w-full relative flex items-end justify-between gap-1 pt-4 pb-2 px-1 bg-surface-container-lowest/30 rounded-xl border border-outline-variant/30 overflow-hidden"
+        className={`w-full relative flex items-end justify-between gap-1 pt-4 pb-2 px-1 bg-surface-container-lowest/30 rounded-xl border border-outline-variant/30 ${scrollableDays ? 'overflow-x-auto snap-x snap-mandatory' : 'overflow-hidden'}`}
         style={{ height: `${height}px` }}
       >
         {/* GRID LINES FOR BARS / LINES / DOTS */}
@@ -76,7 +79,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         {/* 1. BARRAS */}
         {chartType === 'barras' && (
-          <div className="w-full h-full flex items-end justify-between gap-1 z-10">
+          <div className={`w-full h-full flex items-end gap-1 z-10 ${scrollableDays ? 'min-w-max' : 'justify-between'}`}>
             {data.map((pt, idx) => {
               const isToday = pt.label.startsWith('Hoy');
               const hasActivity = pt.ingresos > 0 || pt.gastos > 0 || pt.gananciaReal !== 0;
@@ -91,7 +94,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
                 <div
                   key={idx}
                   onClick={() => onSelectPoint?.(isSelected ? null : idx)}
-                  className={`flex-1 flex flex-col items-center justify-end h-full group cursor-pointer transition-all rounded-lg p-0.5 ${
+                  className={`${scrollableDays ? 'flex-shrink-0 min-w-[46px] snap-start' : 'flex-1'} flex flex-col items-center justify-end h-full group cursor-pointer transition-all rounded-lg p-0.5 ${
                     isSelected
                       ? 'bg-primary/20 ring-1 ring-primary shadow-sm'
                       : isToday
