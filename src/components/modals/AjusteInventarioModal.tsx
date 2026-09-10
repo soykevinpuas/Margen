@@ -24,22 +24,6 @@ export const AjusteInventarioModal: React.FC<AjusteInventarioModalProps> = ({
     (b) => b.productoId === selectedProductId && b.cantidadDisponible > 0
   );
 
-  useEffect(() => {
-    if (isOpen) {
-      if (activeProducts.length > 0 && (!selectedProductId || !activeProducts.some((p) => p.id === selectedProductId))) {
-        setSelectedProductId(activeProducts[0].id);
-      }
-    }
-  }, [isOpen, activeProducts]);
-
-  useEffect(() => {
-    if (isOpen && selectedProductId) {
-      if (productBatches.length > 0 && (!selectedBatchId || !productBatches.some((b) => b.id === selectedBatchId))) {
-        setSelectedBatchId(productBatches[0].id);
-      }
-    }
-  }, [isOpen, selectedProductId, batches]);
-
   const [quantity, setQuantity] = useState<number | string>(1);
   const [reason, setReason] = useState<AdjustmentReason>('danado');
   const [date, setDate] = useState<string>(
@@ -47,6 +31,19 @@ export const AjusteInventarioModal: React.FC<AjusteInventarioModalProps> = ({
   );
   const [notes, setNotes] = useState<string>('');
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuantity(1);
+      setReason('danado');
+      setDate(new Date().toISOString().split('T')[0]);
+      setNotes('');
+      setMessage(null);
+      if (activeProducts.length > 0) {
+        setSelectedProductId(activeProducts[0].id);
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

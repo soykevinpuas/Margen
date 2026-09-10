@@ -36,7 +36,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
               Margen
             </span>
             <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest block">
-              Control FIFO
+              Control de Inventario
             </span>
           </div>
         </div>
@@ -66,11 +66,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight max-w-3xl">
-          Calcula tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">ganancia real</span> con asignación FIFO por lotes
+          Calcula tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">ganancia real</span> de forma automática por lotes
         </h1>
 
         <p className="text-sm sm:text-base text-slate-400 max-w-2xl leading-relaxed">
-          Diseñado para revendedores, tiendas e importadores. Toma en cuenta gastos de envío, impuestos, comisiones de venta y prorrateo de costos para saber exactamente cuánto ganas en cada producto.
+          Diseñado para negocios, tiendas e importadores. Toma en cuenta envíos, impuestos, comisiones y costos de compra para saber exactamente cuánto ganas en cada venta.
         </p>
 
         {/* Action Buttons */}
@@ -115,7 +115,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
               <span className="font-semibold text-slate-200">Panel de Control Margen</span>
             </div>
             <span className="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800/50 font-mono">
-              FIFO ACTIVO
+              LOTES ACTIVOS
             </span>
           </div>
 
@@ -126,9 +126,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
               <span className="text-[10px] text-emerald-500 block mt-0.5">+32% de utilidad bruta</span>
             </div>
             <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-              <span className="text-[10px] text-slate-400 font-medium block">Costo de Ventas (COGS)</span>
+              <span className="text-[10px] text-slate-400 font-medium block">Costo de Ventas</span>
               <span className="text-lg font-bold text-slate-200">$2,910.00 MXN</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">Calculado por lotes antiguos</span>
+              <span className="text-[10px] text-slate-400 block mt-0.5">Calculado por lotes de compra</span>
             </div>
           </div>
 
@@ -164,9 +164,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
               <Layers className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white">Método FIFO Real</h3>
+            <h3 className="text-base font-bold text-white">Descuento por Antigüedad</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Descuenta existencias comenzando por el lote más antiguo comprado. Cada lote mantiene su propio costo unitario exacto.
+              Descuenta las existencias comenzando automáticamente por el lote comprado primero. Cada lote guarda su costo exacto.
             </p>
           </div>
 
@@ -250,7 +250,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
             </span>
             <h4 className="text-sm font-bold text-white mb-1">Cobra tus Ventas</h4>
             <p className="text-xs text-slate-400">
-              Registra cada venta. Margen deduce automáticamente los lotes FIFO más antiguos con sus costos exactos.
+              Registra cada venta. Margen descuenta automáticamente los lotes de compra más antiguos con sus costos exactos.
             </p>
           </div>
 
@@ -300,7 +300,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
       <footer className="w-full border-t border-slate-800/60 py-6 px-4 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between max-w-5xl gap-3">
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-300">Margen</span>
-          <span>© {new Date().getFullYear()} — Control de Inventario y Ventas FIFO</span>
+          <span>© {new Date().getFullYear()} — Control de Inventarios y Ganancias Reales</span>
         </div>
         <div className="flex items-center gap-4 text-slate-400">
           <button onClick={onEnterApp} className="hover:text-emerald-400">

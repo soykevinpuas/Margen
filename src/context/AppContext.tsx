@@ -31,7 +31,7 @@ import {
   initialSales,
   initialOperatingExpenses,
 } from '../data/seedData';
-import { calculateFifoAllocation } from '../utils/calculations';
+import { calculateFifoAllocation, getLocalDateKey } from '../utils/calculations';
 
 interface AppContextType {
   settings: AppSettings;
@@ -60,6 +60,18 @@ interface AppContextType {
     esInventarioInicial?: boolean;
   }) => PurchaseBatch;
   updateBatchNotes: (id: string, notas: string) => void;
+  updatePurchaseBatch: (
+    id: string,
+    batchData: {
+      cantidadComprada?: number;
+      costoProductoUnitarioMXN?: number;
+      gastosDeCompra?: ExpenseItem[];
+      fecha?: string;
+      proveedor?: string;
+      notas?: string;
+    }
+  ) => void;
+  deletePurchaseBatch: (id: string) => { success: boolean; message: string };
   addSale: (saleData: {
     productoId: string;
     cantidad: number;
@@ -87,6 +99,8 @@ interface AppContextType {
     fecha: string;
     notas?: string;
   }) => { success: boolean; message: string };
+  updateSaleDate: (saleId: string, newFecha: string) => void;
+  updateBatchDate: (batchId: string, newFecha: string) => void;
   resetToSeedData: () => void;
   clearAllData: () => Promise<void>;
 }
@@ -100,7 +114,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_settings`);
-    return saved ? JSON.parse(saved) : initialSettings;
+    if (saved) {
+      try {
+        return { ...initialSettings, ...JSON.parse(saved) };
+      } catch (e) {
+        console.error('Error parsing saved settings', e);
+      }
+    }
+    return initialSettings;
   });
 
   const [categories, setCategories] = useState<Category[]>(() => {
@@ -120,12 +141,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [sales, setSales] = useState<Sale[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_sales`);
-    return saved ? JSON.parse(saved) : initialSales;
+    let loaded: Sale[] = saved ? JSON.parse(saved) : initialSales;
+
+    // Check if sales are from old static dates (e.g., 2026-08-04) and shift them if no sales exist today
+    const todayKey = getLocalDateKey(new Date());
+    const hasSaleToday = loaded.some((s) => s.fecha && getLocalDateKey(s.fecha) === todayKey);
+
+    if (!hasSaleToday && loaded.length > 0) {
+      const newestSaleKey = loaded.reduce((max, s) => {
+        const key = getLocalDateKey(s.fecha);
+        return key > max ? key : max;
+      }, '');
+
+      if (newestSaleKey && newestSaleKey < todayKey) {
+        // Shift sales from newestSaleKey to today
+        loaded = loaded.map((s) => {
+          if (getLocalDateKey(s.fecha) === newestSaleKey) {
+            return { ...s, fecha: new Date().toISOString() };
+          }
+          return s;
+        });
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_sales`, JSON.stringify(loaded));
+      }
+    }
+
+    return loaded;
   });
 
   const [operatingExpenses, setOperatingExpenses] = useState<OperatingExpense[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_expenses`);
-    return saved ? JSON.parse(saved) : initialOperatingExpenses;
+    let loaded: OperatingExpense[] = saved ? JSON.parse(saved) : initialOperatingExpenses;
+
+    const todayKey = getLocalDateKey(new Date());
+    const hasExpToday = loaded.some((e) => e.fecha && getLocalDateKey(e.fecha) === todayKey);
+
+    if (!hasExpToday && loaded.length > 0) {
+      const newestExpKey = loaded.reduce((max, e) => {
+        const key = getLocalDateKey(e.fecha);
+        return key > max ? key : max;
+      }, '');
+
+      if (newestExpKey && newestExpKey < todayKey) {
+        loaded = loaded.map((e) => {
+          if (getLocalDateKey(e.fecha) === newestExpKey) {
+            return { ...e, fecha: todayKey };
+          }
+          return e;
+        });
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_expenses`, JSON.stringify(loaded));
+      }
+    }
+
+    return loaded;
   });
 
   const [adjustments, setAdjustments] = useState<InventoryAdjustment[]>(() => {
@@ -142,9 +209,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Settings
     const unsubSettings = onSnapshot(doc(db, 'users', uid, 'settings', 'config'), (snapshot) => {
       if (snapshot.exists()) {
-        setSettings(snapshot.data() as AppSettings);
+        const loaded = snapshot.data() as AppSettings;
+        setSettings((prev) => {
+          const merged = { ...initialSettings, ...prev, ...loaded };
+          localStorage.setItem(`${LOCAL_STORAGE_KEY}_settings`, JSON.stringify(merged));
+          return merged;
+        });
       } else {
-        setDoc(doc(db, 'users', uid, 'settings', 'config'), initialSettings);
+        setSettings((current) => {
+          const merged = { ...initialSettings, ...current };
+          safeSetDoc(doc(db, 'users', uid, 'settings', 'config'), merged);
+          return merged;
+        });
       }
     });
 
@@ -212,11 +288,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [user]);
 
-  // Save to LocalStorage when unauthenticated
+  // Always save settings to LocalStorage for persistence across sessions/logouts
   useEffect(() => {
-    if (user) return;
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_settings`, JSON.stringify(settings));
-  }, [settings, user]);
+  }, [settings]);
+
+  // Apply custom primary theme color and background color
+  useEffect(() => {
+    const colorMap: Record<string, { primary: string; onPrimary: string }> = {
+      emerald: { primary: '#10b981', onPrimary: '#022c22' },
+      violet: { primary: '#8b5cf6', onPrimary: '#1e1b4b' },
+      blue: { primary: '#3b82f6', onPrimary: '#172554' },
+      amber: { primary: '#f59e0b', onPrimary: '#451a03' },
+      rose: { primary: '#f43f5e', onPrimary: '#4c0519' },
+      teal: { primary: '#14b8a6', onPrimary: '#042f2e' },
+    };
+
+    const colorKey = settings.primaryColor || 'emerald';
+    const selected =
+      colorMap[colorKey] ||
+      (colorKey.startsWith('#')
+        ? { primary: colorKey, onPrimary: '#ffffff' }
+        : colorMap.emerald);
+
+    document.documentElement.style.setProperty('--color-primary', selected.primary);
+    document.documentElement.style.setProperty('--color-on-primary', selected.onPrimary);
+
+    // Background color palette
+    const bgMap: Record<string, { bg: string; surface: string; container: string }> = {
+      dark: { bg: '#090d16', surface: '#111827', container: '#1f2937' },
+      black: { bg: '#000000', surface: '#111111', container: '#1c1c1c' },
+      charcoal: { bg: '#121212', surface: '#1e1e1e', container: '#2a2a2a' },
+      midnight: { bg: '#0b132b', surface: '#1c2541', container: '#2b3a55' },
+      zinc: { bg: '#18181b', surface: '#27272a', container: '#3f3f46' },
+      warm: { bg: '#1c1917', surface: '#292524', container: '#44403c' },
+      slate: { bg: '#0f172a', surface: '#1e293b', container: '#334155' },
+      emerald_dark: { bg: '#051c14', surface: '#0a2e22', container: '#134e3a' },
+    };
+
+    const bgKey = settings.backgroundColor || 'dark';
+    const selectedBg =
+      bgMap[bgKey] ||
+      (bgKey.startsWith('#')
+        ? { bg: bgKey, surface: '#111827', container: '#1f2937' }
+        : bgMap.dark);
+
+    document.documentElement.style.setProperty('--color-background', selectedBg.bg);
+    document.documentElement.style.setProperty('--color-surface', selectedBg.surface);
+    document.documentElement.style.setProperty('--color-surface-container', selectedBg.container);
+
+    // Apply directly to root html, body and meta theme-color to prevent static color on scroll/overscroll
+    document.documentElement.style.backgroundColor = selectedBg.bg;
+    if (document.body) {
+      document.body.style.backgroundColor = selectedBg.bg;
+    }
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', selectedBg.bg);
+    }
+  }, [settings.primaryColor, settings.backgroundColor]);
 
   useEffect(() => {
     if (user) return;
@@ -275,6 +405,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     const updated = { ...settings, ...newSettings };
     setSettings(updated);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_settings`, JSON.stringify(updated));
     if (user) {
       safeSetDoc(doc(db, 'users', user.uid, 'settings', 'config'), updated);
     }
@@ -398,6 +529,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user) {
       setDoc(doc(db, 'users', user.uid, 'batches', id), updated);
     }
+  };
+
+  const updatePurchaseBatch = (
+    id: string,
+    batchData: {
+      cantidadComprada?: number;
+      costoProductoUnitarioMXN?: number;
+      gastosDeCompra?: ExpenseItem[];
+      fecha?: string;
+      proveedor?: string;
+      notas?: string;
+    }
+  ) => {
+    const existing = batches.find((b) => b.id === id);
+    if (!existing) return;
+
+    const cantidadComprada = batchData.cantidadComprada ?? existing.cantidadComprada;
+    const costoProductoUnitarioMXN =
+      batchData.costoProductoUnitarioMXN ?? existing.costoProductoUnitarioMXN;
+    const gastosDeCompra = batchData.gastosDeCompra ?? existing.gastosDeCompra;
+    const fecha = batchData.fecha ?? existing.fecha;
+    const proveedor = batchData.proveedor ?? existing.proveedor;
+    const notas = batchData.notas ?? existing.notas;
+
+    // Calculate how many units were sold from this batch so far
+    const soldUnits = existing.cantidadComprada - existing.cantidadDisponible;
+    const cantidadDisponible = Math.max(0, cantidadComprada - soldUnits);
+
+    const costoProductosMXN = cantidadComprada * costoProductoUnitarioMXN;
+    const gastosTotal = gastosDeCompra.reduce((acc, g) => acc + (g.montoMXN || 0), 0);
+    const costoTotalMXN = costoProductosMXN + gastosTotal;
+    const costoUnitarioRealMXN = cantidadComprada > 0 ? costoTotalMXN / cantidadComprada : 0;
+
+    const updated: PurchaseBatch = {
+      ...existing,
+      cantidadComprada,
+      cantidadDisponible,
+      costoProductoUnitarioMXN,
+      costoProductosMXN,
+      gastosDeCompra,
+      costoTotalMXN,
+      costoUnitarioRealMXN,
+      fecha,
+      proveedor,
+      notas,
+    };
+
+    setBatches((prev) => prev.map((b) => (b.id === id ? updated : b)));
+    if (user) {
+      setDoc(doc(db, 'users', user.uid, 'batches', id), updated);
+    }
+  };
+
+  const deletePurchaseBatch = (id: string): { success: boolean; message: string } => {
+    const batch = batches.find((b) => b.id === id);
+    if (!batch) {
+      return { success: false, message: 'El lote especificado no existe.' };
+    }
+
+    const soldUnits = batch.cantidadComprada - batch.cantidadDisponible;
+    if (soldUnits > 0) {
+      return {
+        success: false,
+        message: `Este lote no se puede eliminar completamente porque ya se han vendido ${soldUnits} unidades del mismo.`,
+      };
+    }
+
+    setBatches((prev) => prev.filter((b) => b.id !== id));
+    if (user) {
+      deleteDoc(doc(db, 'users', user.uid, 'batches', id));
+    }
+    return { success: true, message: 'Lote de compra eliminado correctamente.' };
   };
 
   const addSale = (saleData: {
@@ -540,6 +743,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Venta cancelada y stock restaurado con éxito.' };
   };
 
+  const updateSaleDate = (saleId: string, newFecha: string) => {
+    const sale = sales.find((s) => s.id === saleId);
+    if (!sale) return;
+    const updatedSale: Sale = { ...sale, fecha: newFecha };
+    const newSales = sales.map((s) => (s.id === saleId ? updatedSale : s));
+    setSales(newSales);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_sales`, JSON.stringify(newSales));
+    if (user) {
+      safeSetDoc(doc(db, 'users', user.uid, 'sales', saleId), updatedSale);
+    }
+  };
+
+  const updateBatchDate = (batchId: string, newFecha: string) => {
+    const batch = batches.find((b) => b.id === batchId);
+    if (!batch) return;
+    const updatedBatch: PurchaseBatch = { ...batch, fecha: newFecha };
+    const newBatches = batches.map((b) => (b.id === batchId ? updatedBatch : b));
+    setBatches(newBatches);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_batches`, JSON.stringify(newBatches));
+    if (user) {
+      safeSetDoc(doc(db, 'users', user.uid, 'batches', batchId), updatedBatch);
+    }
+  };
+
   const addOperatingExpense = (expenseData: {
     concepto: string;
     categoria: OperatingExpense['categoria'];
@@ -678,8 +905,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteProduct,
         addPurchaseBatch,
         updateBatchNotes,
+        updatePurchaseBatch,
+        deletePurchaseBatch,
         addSale,
         cancelSale,
+        updateSaleDate,
+        updateBatchDate,
         addOperatingExpense,
         addInventoryAdjustment,
         resetToSeedData,

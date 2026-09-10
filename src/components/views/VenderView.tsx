@@ -4,6 +4,7 @@ import {
   formatMoney,
   getProductTotalStock,
   calculateFifoAllocation,
+  getLocalDateKey,
 } from '../../utils/calculations';
 import { Product, SaleExpenseItem } from '../../types';
 
@@ -20,14 +21,21 @@ export const VenderView: React.FC<VenderViewProps> = ({
   onGoToHistory,
   onOpenNuevoProducto,
 }) => {
-  const { settings, products, batches, addSale } = useApp();
+  const { settings, products, batches, sales, addSale, cancelSale, updateSaleDate } = useApp();
   const { displayCurrency, exchangeRate } = settings;
 
+  const [activeTab, setActiveTab] = useState<'registrar' | 'historial'>('registrar');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState<number | string>(1);
   const [unitPrice, setUnitPrice] = useState<string>('');
   const [expenses, setExpenses] = useState<SaleExpenseItem[]>([]);
   const [notes, setNotes] = useState<string>('');
+
+  // Sales history tab filters
+  const [salesSearch, setSalesSearch] = useState('');
+  const [salesFilterState, setSalesFilterState] = useState<'todas' | 'confirmada' | 'cancelada'>('todas');
+  const [cancellingSaleId, setCancellingSaleId] = useState<string | null>(null);
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
   // UI sheets / modals
   const [isProductSheetOpen, setIsProductSheetOpen] = useState<boolean>(false);
@@ -152,6 +160,12 @@ export const VenderView: React.FC<VenderViewProps> = ({
         expenses: expenses.filter((e) => e.montoMXN > 0),
         remainingStock: Math.max(0, remainingStock),
       });
+      // Clear sale form inputs
+      setSelectedProduct(null);
+      setQuantity(1);
+      setUnitPrice('');
+      setExpenses([]);
+      setNotes('');
       setIsSuccessScreen(true);
       onSaleSuccess();
     }
@@ -166,14 +180,21 @@ export const VenderView: React.FC<VenderViewProps> = ({
     setNotes('');
   };
 
-  // Filter products in picker sheet
-  const filteredSheetProducts = activeProducts.filter((p) => {
-    const q = sheetSearch.toLowerCase();
-    return (
-      p.nombre.toLowerCase().includes(q) ||
-      (p.sku && p.sku.toLowerCase().includes(q))
-    );
-  });
+  // Filter products in picker sheet (sorted by creation date, newest first)
+  const filteredSheetProducts = [...activeProducts]
+    .filter((p) => {
+      const q = sheetSearch.toLowerCase();
+      return (
+        p.nombre.toLowerCase().includes(q) ||
+        (p.sku && p.sku.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return (b.id || '').localeCompare(a.id || '');
+    });
 
   if (isSuccessScreen && lastCompletedSaleInfo) {
     return (
@@ -193,7 +214,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
 
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          Inventario Descontado por FIFO
+          Inventario Descontado por Antigüedad
         </span>
 
         <h1 className="text-2xl font-headline font-bold text-on-surface tracking-tight mb-1">
@@ -255,7 +276,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
               </div>
               <div>
                 <span className="text-xs font-bold text-on-surface block">Utilidad Obtenida</span>
-                <span className="text-[10px] text-on-surface-variant">Descontando costo FIFO y gastos</span>
+                <span className="text-[10px] text-on-surface-variant">Descontando costo de lote y gastos</span>
               </div>
             </div>
             <span className="text-base font-extrabold text-emerald-400">
@@ -306,7 +327,10 @@ export const VenderView: React.FC<VenderViewProps> = ({
           </button>
 
           <button
-            onClick={onGoToHistory}
+            onClick={() => {
+              setIsSuccessScreen(false);
+              setActiveTab('historial');
+            }}
             className="flex-1 bg-surface-container border border-outline-variant text-on-surface font-bold text-xs py-3.5 rounded-xl hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">history</span>
@@ -317,19 +341,66 @@ export const VenderView: React.FC<VenderViewProps> = ({
     );
   }
 
+  const filteredSales = sales
+    .filter((s) => {
+      const prod = products.find((p) => p.id === s.productoId);
+      const prodName = prod ? prod.nombre.toLowerCase() : '';
+      const matchesSearch =
+        s.id.toLowerCase().includes(salesSearch.toLowerCase()) ||
+        prodName.includes(salesSearch.toLowerCase());
+
+      const matchesState =
+        salesFilterState === 'todas' ? true : s.estado === salesFilterState;
+
+      return matchesSearch && matchesState;
+    })
+    .sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.fecha || 0).getTime();
+      const timeB = new Date(b.createdAt || b.fecha || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return (b.id || '').localeCompare(a.id || '');
+    });
+
+  const handleCancelSaleInTab = (saleId: string) => {
+    const res = cancelSale(saleId);
+    setCancelMessage(res.message);
+    setCancellingSaleId(null);
+    setTimeout(() => {
+      setCancelMessage(null);
+    }, 3000);
+  };
+
   return (
-    <div className="flex flex-col w-full pb-[280px]">
-      <div className="px-4 py-4 space-y-6">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-headline font-bold text-on-surface">
-            Nueva Venta
-          </h2>
-          <p className="text-on-surface-variant text-xs">
-            Registra la transacción y calcula el costo FIFO y margen al instante.
-          </p>
+    <div className={`flex flex-col w-full ${activeTab === 'registrar' ? 'pb-[280px]' : 'pb-24'}`}>
+      <div className="px-4 py-4 space-y-4">
+        {/* Top Tab Selector */}
+        <div className="flex bg-surface-container border border-outline-variant rounded-xl p-1">
+          <button
+            onClick={() => setActiveTab('registrar')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'registrar'
+                ? 'bg-primary text-on-primary shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">add_shopping_cart</span>
+            Registrar Venta
+          </button>
+          <button
+            onClick={() => setActiveTab('historial')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'historial'
+                ? 'bg-primary text-on-primary shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">history</span>
+            Historial de Ventas ({sales.length})
+          </button>
         </div>
 
-        <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+        {activeTab === 'registrar' ? (
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-6 pt-2">
           {/* STEP 1: PRODUCT SELECTION */}
           <section className="space-y-3">
             <div className="flex items-center justify-between">
@@ -588,8 +659,6 @@ export const VenderView: React.FC<VenderViewProps> = ({
               />
             </div>
           )}
-        </form>
-      </div>
 
       {/* STICKY BOTTOM SUMMARY PANEL */}
       {selectedProduct && (
@@ -606,7 +675,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
 
             <div className="text-right space-y-0.5">
               <span className="text-[10px] text-on-surface-variant font-medium">
-                Costo FIFO + Gastos
+                Costo Producto + Gastos
               </span>
               <div className="text-xs font-bold text-on-surface">
                 -{formatMoney(totalCost, displayCurrency, exchangeRate)}
@@ -657,6 +726,207 @@ export const VenderView: React.FC<VenderViewProps> = ({
           </button>
         </div>
       )}
+      </form>
+      ) : (
+        /* HISTORIAL DE VENTAS TAB */
+        <div className="space-y-4 pt-2">
+          {cancelMessage && (
+            <div className="bg-primary/20 text-primary border border-primary/30 p-3 rounded-xl text-xs font-bold flex items-center justify-between">
+              <span>{cancelMessage}</span>
+              <button onClick={() => setCancelMessage(null)}>
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          )}
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
+                search
+              </span>
+              <input
+                type="text"
+                value={salesSearch}
+                onChange={(e) => setSalesSearch(e.target.value)}
+                placeholder="Buscar venta o producto..."
+                className="w-full h-10 bg-surface-container text-on-surface text-xs rounded-xl pl-9 pr-3 outline-none border border-outline-variant focus:border-primary"
+              />
+            </div>
+
+            <div className="flex gap-1 bg-surface-container border border-outline-variant p-1 rounded-xl">
+              <button
+                onClick={() => setSalesFilterState('todas')}
+                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                  salesFilterState === 'todas'
+                    ? 'bg-primary text-on-primary'
+                    : 'text-on-surface-variant'
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => setSalesFilterState('confirmada')}
+                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                  salesFilterState === 'confirmada'
+                    ? 'bg-emerald-500 text-slate-950'
+                    : 'text-on-surface-variant'
+                }`}
+              >
+                Confirmadas
+              </button>
+              <button
+                onClick={() => setSalesFilterState('cancelada')}
+                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                  salesFilterState === 'cancelada'
+                    ? 'bg-error text-on-error'
+                    : 'text-on-surface-variant'
+                }`}
+              >
+                Canceladas
+              </button>
+            </div>
+          </div>
+
+          {/* Sales List */}
+          {filteredSales.length === 0 ? (
+            <div className="py-12 flex flex-col items-center justify-center text-center bg-surface-container border border-outline-variant/50 rounded-xl p-6">
+              <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-2">
+                history
+              </span>
+              <p className="text-sm font-bold text-on-surface">No hay ventas registradas</p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Las ventas que realices aparecerán aquí en orden cronológico.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredSales.map((sale) => {
+                const product = products.find((p) => p.id === sale.productoId);
+                const isCancelled = sale.estado === 'cancelada';
+
+                return (
+                  <div
+                    key={sale.id}
+                    className={`bg-surface-container border rounded-xl p-3.5 space-y-2 transition-all ${
+                      isCancelled
+                        ? 'border-error/30 opacity-70 bg-error/5'
+                        : 'border-outline-variant hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant shadow-sm">
+                          {product?.imagen ? (
+                            <img
+                              src={product.imagen}
+                              alt={product.nombre}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
+                              inventory_2
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] text-on-surface-variant font-bold">
+                              {sale.id}
+                            </span>
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                isCancelled
+                                  ? 'bg-error/20 text-error'
+                                  : 'bg-emerald-500/20 text-emerald-400'
+                              }`}
+                            >
+                              {isCancelled ? 'Cancelada' : 'Confirmada'}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-on-surface text-xs mt-0.5 truncate">
+                            {product ? product.nombre : 'Producto no encontrado'}
+                          </h4>
+                          <p className="text-[10px] text-on-surface-variant truncate">
+                            {sale.fechaISO ? new Date(sale.fechaISO).toLocaleString() : sale.fecha}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-sm font-headline font-bold text-on-surface">
+                          {formatMoney(
+                            sale.ingresoTotalMXN,
+                            displayCurrency,
+                            exchangeRate
+                          )}
+                        </div>
+                        <div className="text-[10px] text-tertiary font-bold mt-0.5">
+                          Ganancia:{' '}
+                          {formatMoney(
+                            sale.gananciaVentaMXN ?? 0,
+                            displayCurrency,
+                            exchangeRate
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center bg-surface-container-lowest rounded-lg p-2 text-[10px] text-on-surface-variant border border-outline-variant/20">
+                      <span>
+                        Cantidad: <strong className="text-on-surface">{(sale.cantidad ?? 0)} u.</strong> @{' '}
+                        {formatMoney(sale.precioVentaUnitarioMXN ?? 0, displayCurrency, exchangeRate)}
+                      </span>
+                      <span>
+                        Margen:{' '}
+                        <strong className={(sale.margenPorcentaje ?? 0) >= 0 ? 'text-tertiary' : 'text-error'}>
+                          {(sale.margenPorcentaje ?? 0).toFixed(1)}%
+                        </strong>
+                      </span>
+                    </div>
+
+                    {sale.notas && (
+                      <p className="text-[10px] text-on-surface-variant italic bg-surface-container-lowest/50 p-1.5 rounded border border-outline-variant/10">
+                        "{sale.notas}"
+                      </p>
+                    )}
+
+                    {!isCancelled && (
+                      <div className="pt-2 border-t border-outline-variant/20 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant/60 rounded-lg px-2 py-1 text-[10px]">
+                          <span className="material-symbols-outlined text-[14px] text-primary">edit_calendar</span>
+                          <span className="font-bold text-on-surface-variant">Fecha:</span>
+                          <input
+                            type="date"
+                            value={getLocalDateKey(sale.fecha)}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                updateSaleDate(sale.id, e.target.value);
+                              }
+                            }}
+                            className="bg-transparent font-bold text-primary focus:outline-none cursor-pointer text-[10px]"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => setCancellingSaleId(sale.id)}
+                          className="px-2.5 py-1 bg-error/10 border border-error/30 text-error hover:bg-error/20 font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">cancel</span>
+                          Anular Venta y Devolver Stock
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      </div>
 
       {/* PRODUCT SELECTOR SHEET MODAL */}
       {isProductSheetOpen && (
@@ -781,6 +1051,41 @@ export const VenderView: React.FC<VenderViewProps> = ({
             </div>
           </div>
         </>
+      )}
+
+      {/* CONFIRMATION MODAL FOR CANCEL SALE IN VENDER VIEW */}
+      {cancellingSaleId && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-surface-container-high border border-error/40 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-error/10 border border-error/30 text-error flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-2xl">warning</span>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-headline font-bold text-on-surface">
+                ¿Confirmar Anulación de Venta?
+              </h3>
+              <p className="text-xs text-on-surface-variant mt-1.5 leading-relaxed">
+                Esta acción anulará la venta <strong className="text-on-surface font-mono">{cancellingSaleId}</strong>, repondrá las unidades correspondientes al inventario y recalculará tus ganancias.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={() => handleCancelSaleInTab(cancellingSaleId)}
+                className="w-full py-2.5 bg-error text-on-error font-bold text-xs rounded-xl hover:bg-error/90 transition-all shadow-md shadow-error/20"
+              >
+                Sí, Anular Venta y Reponer Stock
+              </button>
+              <button
+                onClick={() => setCancellingSaleId(null)}
+                className="w-full py-2.5 bg-surface-container border border-outline-variant text-on-surface font-bold text-xs rounded-xl hover:bg-surface-container-high transition-all"
+              >
+                Cancelar / Mantener Venta
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

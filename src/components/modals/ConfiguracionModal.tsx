@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { LogOut, UserCheck, Shield, Key } from 'lucide-react';
+import { ExportExcelModal } from './ExportExcelModal';
 
 interface ConfiguracionModalProps {
   isOpen: boolean;
@@ -25,6 +26,48 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
   const [minStockDefault, setMinStockDefault] = useState(
     (settings?.defaultMinStock ?? 2).toString()
   );
+  const [primaryColor, setPrimaryColor] = useState(settings?.primaryColor || 'emerald');
+  const [backgroundColor, setBackgroundColor] = useState(settings?.backgroundColor || 'dark');
+  const [chartType, setChartType] = useState<'barras' | 'lineas' | 'puntos' | 'radial'>(
+    settings?.chartType || 'barras'
+  );
+
+  // Excel Modal state
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+
+  // Sync state when settings or isOpen changes
+  useEffect(() => {
+    if (isOpen && settings) {
+      setBusinessName(settings.businessName || 'Margen');
+      setDisplayCurrency(settings.displayCurrency || 'MXN');
+      setExchangeRate((settings.exchangeRate ?? 20).toString());
+      setMinStockDefault((settings.defaultMinStock ?? 2).toString());
+      setPrimaryColor(settings.primaryColor || 'emerald');
+      setBackgroundColor(settings.backgroundColor || 'dark');
+      setChartType(settings.chartType || 'barras');
+    }
+  }, [isOpen, settings]);
+
+  const themeOptions = [
+    { id: 'emerald', name: 'Esmeralda', hex: '#10b981', bgClass: 'bg-[#10b981]' },
+    { id: 'violet', name: 'Violeta', hex: '#8b5cf6', bgClass: 'bg-[#8b5cf6]' },
+    { id: 'blue', name: 'Cobalto', hex: '#3b82f6', bgClass: 'bg-[#3b82f6]' },
+    { id: 'amber', name: 'Ámbar', hex: '#f59e0b', bgClass: 'bg-[#f59e0b]' },
+    { id: 'rose', name: 'Rosa Cobre', hex: '#f43f5e', bgClass: 'bg-[#f43f5e]' },
+    { id: 'teal', name: 'Turquesa', hex: '#14b8a6', bgClass: 'bg-[#14b8a6]' },
+  ];
+
+  const bgOptions = [
+    { id: 'dark', name: 'Oscuro Margen', colorHex: '#090d16' },
+    { id: 'black', name: 'Negro Absoluto', colorHex: '#000000' },
+    { id: 'charcoal', name: 'Gris Carbón', colorHex: '#121212' },
+    { id: 'midnight', name: 'Azul Noche', colorHex: '#0b132b' },
+    { id: 'zinc', name: 'Gris Grafito', colorHex: '#18181b' },
+    { id: 'warm', name: 'Sombra Cálida', colorHex: '#1c1917' },
+    { id: 'slate', name: 'Azul Abismo', colorHex: '#0f172a' },
+    { id: 'emerald_dark', name: 'Verde Oscuro', colorHex: '#051c14' },
+  ];
+
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
@@ -44,12 +87,15 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     updateSettings({
       businessName: businessName.trim() || 'Margen',
       displayCurrency,
       exchangeRate: parseFloat(exchangeRate) || 20.0,
       defaultMinStock: parseInt(minStockDefault) || 2,
+      primaryColor,
+      backgroundColor,
+      chartType,
     });
     setIsSaving(false);
     onClose();
@@ -232,6 +278,126 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
             />
           </div>
 
+          {/* Tipo de Gráficas */}
+          <div>
+            <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] mb-1 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px] text-primary">bar_chart</span>
+              Tipo de Gráficas Preferido
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setChartType('barras')}
+                className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all ${
+                  chartType === 'barras'
+                    ? 'bg-primary text-on-primary border-primary shadow-sm'
+                    : 'bg-surface-container text-on-surface-variant border-outline-variant hover:border-primary/50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">bar_chart</span>
+                Barras
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setChartType('lineas')}
+                className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all ${
+                  chartType === 'lineas'
+                    ? 'bg-primary text-on-primary border-primary shadow-sm'
+                    : 'bg-surface-container text-on-surface-variant border-outline-variant hover:border-primary/50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">show_chart</span>
+                Líneas
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setChartType('puntos')}
+                className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all ${
+                  chartType === 'puntos'
+                    ? 'bg-primary text-on-primary border-primary shadow-sm'
+                    : 'bg-surface-container text-on-surface-variant border-outline-variant hover:border-primary/50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">scatter_plot</span>
+                Puntos
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setChartType('radial')}
+                className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all ${
+                  chartType === 'radial'
+                    ? 'bg-primary text-on-primary border-primary shadow-sm'
+                    : 'bg-surface-container text-on-surface-variant border-outline-variant hover:border-primary/50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">donut_large</span>
+                Radial / Dona
+              </button>
+            </div>
+            <p className="text-[9px] text-on-surface-variant mt-1">
+              Aplica a la vista de reportes y a las mini-gráficas del Dashboard.
+            </p>
+          </div>
+
+          {/* Color del Tema / Detalles */}
+          <div>
+            <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px] text-primary">palette</span>
+              Color Principal y Accent
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {themeOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPrimaryColor(opt.id)}
+                  className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
+                    primaryColor === opt.id
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary'
+                      : 'border-outline-variant bg-surface-container hover:border-outline'
+                  }`}
+                >
+                  <div className={`w-3.5 h-3.5 rounded-full ${opt.bgClass} border border-white/20 shrink-0`} />
+                  <span className="text-[11px] font-bold text-on-surface truncate">{opt.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Color de Fondo */}
+          <div>
+            <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px] text-primary">format_paint</span>
+              Color de Fondo (Tema Oscuro Neutro)
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {bgOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setBackgroundColor(opt.id)}
+                  className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${
+                    backgroundColor === opt.id
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary'
+                      : 'border-outline-variant bg-surface-container hover:border-outline'
+                  }`}
+                >
+                  <div
+                    className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0"
+                    style={{ backgroundColor: opt.colorHex }}
+                  />
+                  <span className="text-[11px] font-bold text-on-surface truncate">{opt.name}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-on-surface-variant mt-1">
+              Colores seleccionados para garantizar alto contraste y legibilidad con las tarjetas y texto.
+            </p>
+          </div>
+
           <div className="pt-2">
             <button
               type="submit"
@@ -274,6 +440,34 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Exportar Resumen Excel */}
+          <div className="border-t border-outline-variant/30 pt-4 mt-4 space-y-2">
+            <span className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px] text-emerald-400">description</span>
+              Reportes y Hojas de Cálculo (Excel)
+            </span>
+
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-xs text-on-surface">Descargar Resumen Mensual (.xlsx)</h4>
+                  <p className="text-[10px] text-on-surface-variant">
+                    Genera un documento Excel oficial con encabezado de {businessName || 'tu marca'}, resumen ejecutivo, ventas, inventario y gastos.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsExcelModalOpen(true)}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-all text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-base">download</span>
+                <span>Configurar y Descargar Excel</span>
+              </button>
+            </div>
+          </div>
 
           {/* Reset / Clear Data Section */}
           <div className="border-t border-outline-variant/30 pt-4 mt-4 space-y-3">
@@ -400,6 +594,11 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
             )}
           </div>
         </form>
+
+        <ExportExcelModal
+          isOpen={isExcelModalOpen}
+          onClose={() => setIsExcelModalOpen(false)}
+        />
       </div>
     </div>
   );

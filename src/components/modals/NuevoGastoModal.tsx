@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { OperatingExpense } from '../../types';
 
@@ -22,6 +22,21 @@ export const NuevoGastoModal: React.FC<NuevoGastoModalProps> = ({
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [notas, setNotas] = useState('');
 
+  const resetForm = () => {
+    setConcepto('');
+    setCategoria('renta');
+    setMonto('');
+    setFecha(new Date().toISOString().split('T')[0]);
+    setEsRecurrente(false);
+    setNotas('');
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,6 +53,7 @@ export const NuevoGastoModal: React.FC<NuevoGastoModalProps> = ({
       notas,
     });
 
+    resetForm();
     onClose();
   };
 

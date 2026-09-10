@@ -68,13 +68,13 @@ export const AppContent: React.FC = () => {
   // 1. Loading State
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-100">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-0.5 animate-bounce">
-          <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center font-extrabold text-emerald-400 text-lg">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 text-on-surface">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary to-secondary p-0.5 animate-bounce">
+          <div className="w-full h-full bg-surface rounded-[14px] flex items-center justify-center font-extrabold text-primary text-lg">
             %
           </div>
         </div>
-        <p className="text-xs font-semibold text-slate-400">Cargando Margen...</p>
+        <p className="text-xs font-semibold text-on-surface-variant">Cargando Margen...</p>
       </div>
     );
   }
@@ -121,7 +121,6 @@ export const AppContent: React.FC = () => {
           currentTabTitle={tabTitles[activeTab]}
           onOpenSettings={() => setIsConfiguracionOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
-          onOpenLanding={() => setViewMode('landing')}
         />
 
         {/* Main View Area */}
@@ -173,7 +172,6 @@ export const AppContent: React.FC = () => {
               onOpenGastosOperativos={() => setIsGastosOperativosOpen(true)}
               onOpenAjusteInventario={() => setIsAjusteInventarioOpen(true)}
               onOpenConfiguracion={() => setIsConfiguracionOpen(true)}
-              onOpenLanding={() => setViewMode('landing')}
             />
           )}
         </main>

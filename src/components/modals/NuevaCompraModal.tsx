@@ -50,21 +50,33 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
     date: string;
   } | null>(null);
 
-  // Synchronize selectedProductId when modal opens or products update
+  // Reset all modal form fields
+  const resetFormFields = () => {
+    setQuantity(1);
+    setUnitCost('');
+    setTotalProductCost('');
+    setExpenses([]);
+    setDate(new Date().toISOString().split('T')[0]);
+    setSupplier('');
+    setNotes('');
+    setIsInitialInventory(false);
+    setIsConfirmed(false);
+    setLastPurchaseInfo(null);
+  };
+
+  // Synchronize selectedProductId and reset fields when modal opens
   useEffect(() => {
     if (isOpen) {
-      setIsConfirmed(false);
+      resetFormFields();
       if (preselectedProductId) {
         setSelectedProductId(preselectedProductId);
       } else if (activeProducts.length > 0) {
-        if (!selectedProductId || !activeProducts.some((p) => p.id === selectedProductId)) {
-          setSelectedProductId(activeProducts[0].id);
-        }
+        setSelectedProductId(activeProducts[0].id);
       } else {
         setSelectedProductId('');
       }
     }
-  }, [isOpen, preselectedProductId, activeProducts]);
+  }, [isOpen, preselectedProductId]);
 
   if (!isOpen) return null;
 

@@ -7,6 +7,9 @@ export interface AppSettings {
   inventoryViewMode: 'grouped' | 'list';
   defaultMinStock: number;
   timeZone: string;
+  primaryColor?: string;
+  backgroundColor?: string;
+  chartType?: 'barras' | 'lineas' | 'puntos' | 'radial';
 }
 
 export interface Category {

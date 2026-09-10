@@ -8,12 +8,15 @@ import {
 } from '../types';
 
 export const initialSettings: AppSettings = {
-  businessName: 'Mi Negocio Margen',
+  businessName: 'Margen',
   displayCurrency: 'MXN',
   exchangeRate: 20.0,
   inventoryViewMode: 'grouped',
   defaultMinStock: 3,
   timeZone: 'America/Mexico_City',
+  primaryColor: 'emerald',
+  backgroundColor: 'dark',
+  chartType: 'barras',
 };
 
 export const initialCategories: Category[] = [
@@ -234,6 +237,28 @@ export const initialBatches: PurchaseBatch[] = [
   },
 ];
 
+const getTodayISO = (hoursAgo = 0) => {
+  const d = new Date();
+  d.setHours(d.getHours() - hoursAgo);
+  return d.toISOString();
+};
+
+const getDaysAgoISO = (days: number, hoursAgo = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(d.getHours() - hoursAgo);
+  return d.toISOString();
+};
+
+const getDaysAgoDateKey = (days: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const initialSales: Sale[] = [
   {
     id: 'V-8942',
@@ -253,11 +278,11 @@ export const initialSales: Sale[] = [
     gastosDeVentaTotalMXN: 232,
     gananciaVentaMXN: 2268, // 5400 - 2900 - 232 = 2268
     margenPorcentaje: 42.0,
-    fecha: '2026-08-04T14:32:00Z',
+    fecha: getTodayISO(2),
     metodoAsignacion: 'FIFO',
     estado: 'confirmada',
     notas: 'Cliente recurrente entrega personal',
-    createdAt: '2026-08-04T14:32:00Z',
+    createdAt: getTodayISO(2),
   },
   {
     id: 'V-8941',
@@ -277,10 +302,10 @@ export const initialSales: Sale[] = [
     gastosDeVentaTotalMXN: 150,
     gananciaVentaMXN: 420, // 1450 - 880 - 150 = 420
     margenPorcentaje: 28.97,
-    fecha: '2026-08-04T11:15:00Z',
+    fecha: getTodayISO(5),
     metodoAsignacion: 'FIFO',
     estado: 'confirmada',
-    createdAt: '2026-08-04T11:15:00Z',
+    createdAt: getTodayISO(5),
   },
   {
     id: 'V-8940',
@@ -300,10 +325,10 @@ export const initialSales: Sale[] = [
     gastosDeVentaTotalMXN: 0,
     gananciaVentaMXN: 210,
     margenPorcentaje: 58.33,
-    fecha: '2026-08-03T16:45:00Z',
+    fecha: getDaysAgoISO(1, 2),
     metodoAsignacion: 'FIFO',
     estado: 'confirmada',
-    createdAt: '2026-08-03T16:45:00Z',
+    createdAt: getDaysAgoISO(1, 2),
   },
   {
     id: 'V-8939',
@@ -323,10 +348,10 @@ export const initialSales: Sale[] = [
     gastosDeVentaTotalMXN: 20,
     gananciaVentaMXN: 200,
     margenPorcentaje: 44.44,
-    fecha: '2026-08-02T09:20:00Z',
+    fecha: getDaysAgoISO(2, 4),
     metodoAsignacion: 'FIFO',
     estado: 'confirmada',
-    createdAt: '2026-08-02T09:20:00Z',
+    createdAt: getDaysAgoISO(2, 4),
   },
 ];
 
@@ -336,39 +361,39 @@ export const initialOperatingExpenses: OperatingExpense[] = [
     concepto: 'Renta Local / Bodega',
     categoria: 'renta',
     montoMXN: 4500,
-    fecha: '2026-08-01',
+    fecha: getDaysAgoDateKey(5),
     esRecurrente: true,
     notas: 'Renta mensual espacio de almacenamiento',
-    createdAt: '2026-08-01T08:00:00Z',
+    createdAt: getDaysAgoISO(5),
   },
   {
     id: 'op-2',
     concepto: 'CFE - Luz y Energía',
     categoria: 'servicios',
     montoMXN: 845,
-    fecha: '2026-08-02',
+    fecha: getDaysAgoDateKey(3),
     esRecurrente: true,
     notas: 'Recibo mensual oficina/almacén',
-    createdAt: '2026-08-02T10:42:00Z',
+    createdAt: getDaysAgoISO(3),
   },
   {
     id: 'op-3',
     concepto: 'Anuncios Facebook & Instagram',
     categoria: 'marketing',
     montoMXN: 1200,
-    fecha: '2026-08-03',
+    fecha: getDaysAgoDateKey(1),
     esRecurrente: false,
     notas: 'Campaña tenis y calzado',
-    createdAt: '2026-08-03T15:30:00Z',
+    createdAt: getDaysAgoISO(1),
   },
   {
     id: 'op-4',
     concepto: 'Cajas y Cinta de Empaque',
     categoria: 'insumos',
     montoMXN: 650,
-    fecha: '2026-08-04',
+    fecha: getDaysAgoDateKey(0),
     esRecurrente: false,
     notas: 'Lote 100 cajas de cartón corrugado',
-    createdAt: '2026-08-04T12:00:00Z',
+    createdAt: getTodayISO(1),
   },
 ];

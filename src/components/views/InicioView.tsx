@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   formatMoney,
   getProductTotalStock,
   getProductBadges,
+  getLocalDateKey,
 } from '../../utils/calculations';
+import { ChartRenderer, ChartDataPoint } from '../ChartRenderer';
+import { CalendarioMesModal } from '../modals/CalendarioMesModal';
 
 interface InicioViewProps {
   onNavigateTab: (tab: 'vender' | 'inventario' | 'graficas' | 'mas') => void;
@@ -19,8 +22,18 @@ export const InicioView: React.FC<InicioViewProps> = ({
   onOpenGasto,
   onSelectProduct,
 }) => {
-  const { settings, products, batches, sales } = useApp();
-  const { displayCurrency, exchangeRate } = settings;
+  const { settings, products, batches, sales, operatingExpenses } = useApp();
+  const { displayCurrency, exchangeRate, chartType = 'barras' } = settings;
+
+  // Modals & Interactive States
+  const [isCalendarioOpen, setIsCalendarioOpen] = useState(false);
+  const [showProfitChart, setShowProfitChart] = useState(false);
+  const [profitChartPeriod, setProfitChartPeriod] = useState<'dia' | 'sem' | 'mes'>('dia');
+  const [profitSelectedIndex, setProfitSelectedIndex] = useState<number | null>(null);
+
+  const [showMiniInventory, setShowMiniInventory] = useState(false);
+  const [spentPeriod, setSpentPeriod] = useState<'dia' | 'sem' | 'mes'>('mes');
+  const [isAlertasOpen, setIsAlertasOpen] = useState(false);
 
   // Calculate KPIs
   const confirmedSales = sales.filter((s) => s.estado === 'confirmada');
@@ -34,6 +47,114 @@ export const InicioView: React.FC<InicioViewProps> = ({
     (acc, b) => acc + b.cantidadDisponible * b.costoUnitarioRealMXN,
     0
   );
+
+  // Calculate Total Gastado based on selected period (dia, sem, mes)
+  const getSpentForPeriod = (p: 'dia' | 'sem' | 'mes') => {
+    const todayKey = getLocalDateKey(new Date());
+    const now = new Date();
+    return confirmedSales.concat([]).reduce((sum, s) => {
+      if (!s.fecha) return sum;
+      const sKey = getLocalDateKey(s.fecha);
+      if (p === 'dia') {
+        return sKey === todayKey ? sum + s.costoUnidadesVendidasMXN : sum;
+      } else if (p === 'sem') {
+        const d = new Date(s.fecha);
+        const diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
+        return diffDays >= 0 && diffDays <= 7 ? sum + s.costoUnidadesVendidasMXN : sum;
+      } else {
+        const d = new Date(s.fecha);
+        const isSameMonth = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        return isSameMonth ? sum + s.costoUnidadesVendidasMXN : sum;
+      }
+    }, 0) + operatingExpenses.reduce((sum, e) => {
+      if (!e.fecha) return sum;
+      const eKey = getLocalDateKey(e.fecha);
+      if (p === 'dia') {
+        return eKey === todayKey ? sum + e.montoMXN : sum;
+      } else if (p === 'sem') {
+        const d = new Date(e.fecha);
+        const diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
+        return diffDays >= 0 && diffDays <= 7 ? sum + e.montoMXN : sum;
+      } else {
+        const d = new Date(e.fecha);
+        const isSameMonth = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        return isSameMonth ? sum + e.montoMXN : sum;
+      }
+    }, 0);
+  };
+
+  const totalSpentVal = getSpentForPeriod(spentPeriod);
+
+  // Generate chart data points for Main Profit Card
+  const getProfitChartData = (): ChartDataPoint[] => {
+    const now = new Date();
+    if (profitChartPeriod === 'dia') {
+      return Array.from({ length: 7 }).map((_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - i), 12, 0, 0);
+        const dayLetter = d.toLocaleDateString('es-ES', { weekday: 'narrow' }).toUpperCase();
+        const dayNum = String(d.getDate()).padStart(2, '0');
+        const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+        const isToday = i === 6;
+        const label = isToday ? `Hoy (${dayNum}/${monthNum})` : `${dayLetter} ${dayNum}/${monthNum}`;
+        const dateStr = getLocalDateKey(d);
+
+        const rev = confirmedSales
+          .filter((s) => s.fecha && getLocalDateKey(s.fecha) === dateStr)
+          .reduce((sum, s) => sum + s.ingresoTotalMXN, 0);
+        const cogs = confirmedSales
+          .filter((s) => s.fecha && getLocalDateKey(s.fecha) === dateStr)
+          .reduce((sum, s) => sum + s.costoUnidadesVendidasMXN, 0);
+        const exp = operatingExpenses
+          .filter((e) => e.fecha && getLocalDateKey(e.fecha) === dateStr)
+          .reduce((sum, e) => sum + e.montoMXN, 0);
+
+        const gastos = cogs + exp;
+        return { label, ingresos: rev, gastos, gananciaReal: rev - gastos };
+      });
+    } else if (profitChartPeriod === 'sem') {
+      return Array.from({ length: 4 }).map((_, i) => {
+        const label = `S${i + 1}`;
+        const endDay = new Date();
+        endDay.setDate(now.getDate() - (3 - i) * 7);
+        const startDay = new Date(endDay);
+        startDay.setDate(endDay.getDate() - 6);
+
+        const rev = confirmedSales
+          .filter((s) => s.fecha && new Date(s.fecha) >= startDay && new Date(s.fecha) <= endDay)
+          .reduce((sum, s) => sum + s.ingresoTotalMXN, 0);
+        const cogs = confirmedSales
+          .filter((s) => s.fecha && new Date(s.fecha) >= startDay && new Date(s.fecha) <= endDay)
+          .reduce((sum, s) => sum + s.costoUnidadesVendidasMXN, 0);
+        const exp = operatingExpenses
+          .filter((e) => e.fecha && new Date(e.fecha) >= startDay && new Date(e.fecha) <= endDay)
+          .reduce((sum, e) => sum + e.montoMXN, 0);
+
+        const gastos = cogs + exp;
+        return { label, ingresos: rev, gastos, gananciaReal: rev - gastos };
+      });
+    } else {
+      return Array.from({ length: 6 }).map((_, i) => {
+        const d = new Date();
+        d.setMonth(now.getMonth() - (5 - i));
+        const label = d.toLocaleDateString('es-ES', { month: 'short' });
+        const year = d.getFullYear();
+        const month = d.getMonth();
+
+        const rev = confirmedSales
+          .filter((s) => s.fecha && new Date(s.fecha).getFullYear() === year && new Date(s.fecha).getMonth() === month)
+          .reduce((sum, s) => sum + s.ingresoTotalMXN, 0);
+        const cogs = confirmedSales
+          .filter((s) => s.fecha && new Date(s.fecha).getFullYear() === year && new Date(s.fecha).getMonth() === month)
+          .reduce((sum, s) => sum + s.costoUnidadesVendidasMXN, 0);
+        const exp = operatingExpenses
+          .filter((e) => e.fecha && new Date(e.fecha).getFullYear() === year && new Date(e.fecha).getMonth() === month)
+          .reduce((sum, e) => sum + e.montoMXN, 0);
+
+        const gastos = cogs + exp;
+        return { label, ingresos: rev, gastos, gananciaReal: rev - gastos };
+      });
+    }
+  };
 
   // Stock alerts
   const outOfStockProducts = products.filter((p) => {
@@ -68,13 +189,18 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
   // Real 7-day sales calculation
   const last7DaysData = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dayName = d.toLocaleDateString('es-ES', { weekday: 'narrow' }).toUpperCase();
-    const dateStr = d.toISOString().split('T')[0];
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - i), 12, 0, 0);
+    const dayAbbr = d.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '');
+    const dayCap = dayAbbr.charAt(0).toUpperCase() + dayAbbr.slice(1);
+    const dayNum = String(d.getDate()).padStart(2, '0');
+    const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+    const isToday = i === 6;
+    const dayName = isToday ? `Hoy (${dayNum}/${monthNum})` : `${dayCap} ${dayNum}/${monthNum}`;
+    const dateStr = getLocalDateKey(d);
 
     const daySalesTotal = confirmedSales.reduce((sum, s) => {
-      const saleDateStr = s.fecha ? s.fecha.split('T')[0] : '';
+      const saleDateStr = getLocalDateKey(s.fecha);
       return saleDateStr === dateStr ? sum + s.ingresoTotalMXN : sum;
     }, 0);
 
@@ -89,61 +215,249 @@ export const InicioView: React.FC<InicioViewProps> = ({
   const maxDayVal = Math.max(...last7DaysData.map((d) => d.val), 1);
 
   return (
-    <div className="flex flex-col w-full px-4 gap-6 pt-4 pb-8">
+    <div className="flex flex-col w-full px-4 gap-6 pt-2 pb-8">
+      {/* Ribbon Tape Banner ("Modo Cinta") */}
+      <div
+        onClick={() => setIsCalendarioOpen(true)}
+        className="w-full bg-gradient-to-r from-primary/15 via-surface-container-high to-primary/15 border border-primary/40 py-2.5 px-3.5 rounded-xl shadow-md flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-lg transition-all group relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-12 h-12 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
+
+        <div className="flex items-center gap-2.5 z-10">
+          <div className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-bold shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
+            <span className="material-symbols-outlined text-lg">calendar_month</span>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-on-surface capitalize">
+              {new Date().toLocaleDateString('es-ES', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 text-[10px] font-extrabold text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-full group-hover:bg-primary group-hover:text-on-primary transition-all z-10 flex-shrink-0">
+          <span>🗓️ Calendario</span>
+          <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+        </div>
+      </div>
+
       {/* KPIs Section */}
       <section className="grid grid-cols-2 gap-3">
-        {/* Ganancia Total (Main KPI) */}
-        <div className="col-span-2 bg-surface-container rounded-xl p-5 border border-outline-variant flex flex-col gap-1 relative overflow-hidden group shadow-sm">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-          <div className="flex items-center gap-2 text-on-surface-variant mb-1 z-10">
-            <span className="material-symbols-outlined text-[18px] text-primary">
-              payments
-            </span>
-            <span className="text-xs font-medium uppercase tracking-wider">
-              Ganancia Total de Ventas
+        {/* Ganancia Total (Main Interactive KPI Card) */}
+        <div
+          onClick={() => setShowProfitChart(!showProfitChart)}
+          className="col-span-2 bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-2 relative overflow-hidden group shadow-sm cursor-pointer hover:border-primary/50 transition-all"
+        >
+          <div className="flex items-center justify-between z-10">
+            <div className="flex items-center gap-2 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[18px] text-primary">
+                payments
+              </span>
+              <span className="text-xs font-medium uppercase tracking-wider">
+                Ganancia Total de Ventas
+              </span>
+            </div>
+            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">
+                {showProfitChart ? 'tag' : 'show_chart'}
+              </span>
+              {showProfitChart ? 'Ver Número' : 'Ver Gráfica'}
             </span>
           </div>
-          <div className="text-3xl font-headline font-bold text-on-surface z-10 flex items-baseline gap-1">
-            {formatMoney(totalProfit, displayCurrency, exchangeRate)}
-          </div>
-          {confirmedSales.length > 0 && (
-            <div className="flex items-center gap-1 mt-2 text-tertiary z-10">
-              <span className="material-symbols-outlined text-[14px]">insights</span>
-              <span className="text-xs font-bold">Ventas registradas en tiempo real</span>
+
+          {!showProfitChart ? (
+            <div>
+              <div className="text-3xl font-headline font-bold text-on-surface z-10 flex items-baseline gap-1">
+                {formatMoney(totalProfit, displayCurrency, exchangeRate)}
+              </div>
+
+              {/* Mini text Ingresado y Gastado */}
+              <div className="flex items-center gap-3 text-[11px] font-bold mt-2 pt-1.5 border-t border-outline-variant/30 z-10">
+                <span className="text-violet-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                  Ingresado: {formatMoney(totalSalesRevenue, displayCurrency, exchangeRate)}
+                </span>
+                <span className="text-rose-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                  Gastado: {formatMoney(confirmedSales.reduce((a, s) => a + s.costoUnidadesVendidasMXN, 0) + operatingExpenses.reduce((a, e) => a + e.montoMXN, 0), displayCurrency, exchangeRate)}
+                </span>
+              </div>
+
+              <p className="text-[10px] text-on-surface-variant mt-1.5 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[12px] text-tertiary">touch_app</span>
+                Toca aquí para transformar esta tarjeta en mini gráfica interactiva
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 pt-1 z-10" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase">
+                  Mini Gráfica ({chartType})
+                </span>
+                {/* Interval selector for mini chart */}
+                <div className="flex bg-surface-container-high rounded-lg p-0.5 border border-outline-variant text-[10px]">
+                  <button
+                    onClick={() => setProfitChartPeriod('dia')}
+                    className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'dia' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+                  >
+                    Día
+                  </button>
+                  <button
+                    onClick={() => setProfitChartPeriod('sem')}
+                    className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'sem' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+                  >
+                    Semana
+                  </button>
+                  <button
+                    onClick={() => setProfitChartPeriod('mes')}
+                    className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'mes' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+                  >
+                    Mes
+                  </button>
+                </div>
+              </div>
+
+              <ChartRenderer
+                data={getProfitChartData()}
+                chartType={chartType}
+                displayCurrency={displayCurrency}
+                exchangeRate={exchangeRate}
+                height={140}
+                showLegend={true}
+                selectedIndex={profitSelectedIndex}
+                onSelectPoint={(idx) => setProfitSelectedIndex(idx)}
+              />
+
+              <button
+                onClick={() => setShowProfitChart(false)}
+                className="text-[10px] text-primary font-bold hover:underline self-center pt-1"
+              >
+                ▲ Volver a vista numérica
+              </button>
             </div>
           )}
         </div>
 
-        {/* Ventas del Mes */}
-        <div className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-1 relative group">
-          <div className="flex items-center gap-2 text-on-surface-variant mb-1 z-10">
-            <span className="material-symbols-outlined text-[16px]">shopping_cart</span>
-            <span className="text-[10px] font-medium uppercase tracking-wider">
-              Ventas Registradas
-            </span>
+        {/* Ventas Registradas (Opens Sales History on Vender tab) */}
+        <div
+          onClick={() => onNavigateTab('vender')}
+          className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-tertiary/50 transition-all shadow-sm"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-1 z-10">
+              <div className="flex items-center gap-1.5 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[16px] text-tertiary">shopping_cart</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider">
+                  Ventas Registradas
+                </span>
+              </div>
+              <span className="material-symbols-outlined text-xs text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+                open_in_new
+              </span>
+            </div>
+            <div className="text-xl font-headline font-bold text-on-surface z-10 mt-1">
+              {totalSalesCountMonth} <span className="text-xs font-normal text-on-surface-variant">ventas</span>
+            </div>
           </div>
-          <div className="text-xl font-headline font-bold text-on-surface z-10">
-            {totalSalesCountMonth}
+          <div className="mt-2 text-[10px] text-tertiary font-bold flex items-center gap-1">
+            <span>Historial de Ventas</span>
+            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
           </div>
-          <span className="text-[10px] text-on-surface-variant mt-1">
-            Ingreso: {formatMoney(totalSalesRevenue, displayCurrency, exchangeRate)}
-          </span>
         </div>
 
-        {/* Valor Inventario */}
-        <div className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-1 relative group">
-          <div className="flex items-center gap-2 text-on-surface-variant mb-1 z-10">
-            <span className="material-symbols-outlined text-[16px]">inventory_2</span>
-            <span className="text-[10px] font-medium uppercase tracking-wider">
-              Valor Inventario
+        {/* Valor Inventario (Interactive: Toggles mini inventory list) */}
+        <div
+          onClick={() => setShowMiniInventory(!showMiniInventory)}
+          className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-primary/50 transition-all shadow-sm"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-1 z-10">
+              <div className="flex items-center gap-1.5 text-on-surface-variant">
+                <span className="material-symbols-outlined text-[16px] text-primary">inventory_2</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider">
+                  Valor Inventario
+                </span>
+              </div>
+              <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                {showMiniInventory ? 'Valor' : 'Mini List'}
+              </span>
+            </div>
+
+            {!showMiniInventory ? (
+              <div className="text-xl font-headline font-bold text-on-surface z-10 mt-1">
+                {formatMoney(totalInventoryValueMXN, displayCurrency, exchangeRate)}
+              </div>
+            ) : (
+              <div className="mt-1 space-y-1.5 z-10 max-h-28 overflow-y-auto pr-1">
+                {products.length === 0 ? (
+                  <p className="text-[10px] text-on-surface-variant">Sin productos</p>
+                ) : (
+                  products.slice(0, 4).map((p) => {
+                    const st = getProductTotalStock(p.id, batches);
+                    return (
+                      <div key={p.id} className="flex justify-between items-center text-[10px] border-b border-outline-variant/20 pb-1">
+                        <span className="truncate font-medium text-on-surface max-w-[80px]">{p.nombre}</span>
+                        <span className={`font-bold ${st <= p.stockMinimo ? 'text-amber-400' : 'text-primary'}`}>{st} u.</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+          <div className="mt-2 text-[10px] text-on-surface-variant font-medium flex justify-between items-center">
+            <span>{showMiniInventory ? '▲ Volver a Total' : 'Toca para Mini Lista'}</span>
+            <span className="material-symbols-outlined text-[12px]">list_alt</span>
+          </div>
+        </div>
+
+        {/* Nuevo Panel: Total Gastado (Día / Semana / Mes) */}
+        <div className="col-span-2 bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-2 relative shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[18px] text-rose-500">
+                account_balance_wallet
+              </span>
+              <span className="text-xs font-headline font-bold uppercase tracking-wider text-on-surface">
+                Total Gastado
+              </span>
+            </div>
+
+            {/* Selector Día, Semana, Mes */}
+            <div className="flex bg-surface-container-high rounded-lg p-0.5 border border-outline-variant text-[10px]">
+              <button
+                onClick={() => setSpentPeriod('dia')}
+                className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'dia' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
+              >
+                Día
+              </button>
+              <button
+                onClick={() => setSpentPeriod('sem')}
+                className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'sem' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
+              >
+                Semana
+              </button>
+              <button
+                onClick={() => setSpentPeriod('mes')}
+                className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'mes' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
+              >
+                Mes
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-baseline justify-between pt-1">
+            <div className="text-2xl font-headline font-bold text-rose-400">
+              {formatMoney(totalSpentVal, displayCurrency, exchangeRate)}
+            </div>
+            <span className="text-[10px] text-on-surface-variant">
+              (Costo mercancía vendida + Gastos op. de {spentPeriod === 'dia' ? 'hoy' : spentPeriod === 'sem' ? 'la semana' : 'este mes'})
             </span>
           </div>
-          <div className="text-xl font-headline font-bold text-on-surface z-10">
-            {formatMoney(totalInventoryValueMXN, displayCurrency, exchangeRate)}
-          </div>
-          <span className="text-[10px] text-tertiary mt-1 font-medium">
-            Cap. Invertido
-          </span>
         </div>
       </section>
 
@@ -191,144 +505,62 @@ export const InicioView: React.FC<InicioViewProps> = ({
         </div>
       </section>
 
-      {/* Sales Chart Summary */}
-      <section className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-sm font-headline font-bold text-on-surface">
-            Ventas (7 días)
-          </h2>
-          <span className="text-xs text-on-surface-variant font-medium">
-            {displayCurrency}
-          </span>
-        </div>
-
-        {/* Bar Chart */}
-        {total7DaysSalesVal === 0 ? (
-          <div className="h-24 w-full flex flex-col items-center justify-center border border-dashed border-outline-variant/50 rounded-lg p-2 text-center">
-            <span className="material-symbols-outlined text-[24px] text-outline mb-1">bar_chart</span>
-            <span className="text-xs text-on-surface-variant font-medium">Sin ventas registradas en los últimos 7 días</span>
-          </div>
-        ) : (
-          <div className="h-24 w-full flex items-end justify-between gap-2 relative">
-            {/* Grid lines */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-              <div className="border-b border-outline-variant/30 w-full h-px"></div>
-              <div className="border-b border-outline-variant/30 w-full h-px"></div>
-              <div className="border-b border-outline-variant/30 w-full h-px"></div>
+      {/* Alertas de Stock Dropdown */}
+      <section className="flex flex-col gap-2">
+        <div
+          onClick={() => setIsAlertasOpen(!isAlertasOpen)}
+          className="w-full bg-surface-container border border-outline-variant hover:border-primary/50 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all shadow-sm group"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <span className="material-symbols-outlined text-base">warning</span>
             </div>
-
-            {last7DaysData.map((item, idx) => {
-              const heightPct = Math.round((item.val / maxDayVal) * 85);
-              const isToday = idx === last7DaysData.length - 1;
-              return (
-                <div
-                  key={idx}
-                  className={`w-full rounded-t-sm relative group cursor-pointer transition-all ${
-                    isToday
-                      ? 'bg-primary shadow-[0_0_10px_rgba(167,139,250,0.4)]'
-                      : 'bg-primary/25 hover:bg-primary/40'
-                  }`}
-                  style={{ height: `${Math.max(heightPct, 4)}%` }}
-                >
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-container-highest border border-outline-variant text-[11px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity text-on-surface z-10 whitespace-nowrap shadow-md">
-                    {formatMoney(item.val, displayCurrency, exchangeRate)}
-                  </div>
-                </div>
-              );
-            })}
+            <span className="text-xs font-bold text-on-surface">
+              Alertas de Stock ({outOfStockProducts.length + lowStockProducts.length})
+            </span>
+            {(outOfStockProducts.length > 0 || lowStockProducts.length > 0) && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-error/15 text-error border border-error/30">
+                {outOfStockProducts.length > 0 ? `${outOfStockProducts.length} Agotado(s)` : `${lowStockProducts.length} Stock Bajo`}
+              </span>
+            )}
           </div>
-        )}
 
-        <div className="flex justify-between items-center text-[10px] text-on-surface-variant px-1">
-          {last7DaysData.map((item, idx) => (
-            <span
-              key={idx}
-              className={idx === last7DaysData.length - 1 ? 'text-primary font-bold' : ''}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigateTab('inventario');
+              }}
+              className="text-[10px] font-bold text-primary hover:underline"
             >
-              {item.day}
+              Ver en Inventario
+            </button>
+            <span className="material-symbols-outlined text-on-surface-variant text-lg group-hover:text-primary transition-colors">
+              {isAlertasOpen ? 'expand_less' : 'expand_more'}
             </span>
-          ))}
-        </div>
-      </section>
-
-      {/* Alertas de Stock */}
-      <section className="flex flex-col gap-3">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
-            <span className="material-symbols-outlined text-[16px] text-error">
-              warning
-            </span>
-            Alertas de Stock
-          </h2>
-          <button
-            onClick={() => onNavigateTab('inventario')}
-            className="text-xs text-primary font-medium hover:underline"
-          >
-            Ver todo
-          </button>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          {outOfStockProducts.length === 0 && lowStockProducts.length === 0 ? (
-            <div className="bg-surface-container border border-outline-variant rounded-lg p-3 text-center text-xs text-on-surface-variant">
-              ✓ Todo el inventario tiene stock suficiente
-            </div>
-          ) : (
-            <>
-              {outOfStockProducts.map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => onSelectProduct(p.id)}
-                  className="bg-surface-container-lowest border border-error/30 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-md bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant flex items-center justify-center">
-                    {p.imagen ? (
-                      <img
-                        src={p.imagen}
-                        alt={p.nombre}
-                        className="w-full h-full object-cover grayscale opacity-60"
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-on-surface-variant text-lg">
-                        inventory_2
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-xs font-bold text-on-surface truncate">
-                      {p.nombre}
-                    </h3>
-                    <p className="text-[11px] text-error font-bold flex items-center gap-1">
-                      Agotado (0 unidades)
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenCompra();
-                    }}
-                    title="Reponer stock"
-                    className="px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors"
-                  >
-                    Reponer
-                  </button>
-                </div>
-              ))}
-
-              {lowStockProducts.map((p) => {
-                const stock = getProductTotalStock(p.id, batches);
-                return (
+        {isAlertasOpen && (
+          <div className="flex flex-col gap-2 pt-1 animate-fade-in">
+            {outOfStockProducts.length === 0 && lowStockProducts.length === 0 ? (
+              <div className="bg-surface-container border border-outline-variant rounded-lg p-3 text-center text-xs text-on-surface-variant">
+                ✓ Todo el inventario tiene stock suficiente
+              </div>
+            ) : (
+              <>
+                {outOfStockProducts.map((p) => (
                   <div
                     key={p.id}
                     onClick={() => onSelectProduct(p.id)}
-                    className="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container transition-colors"
+                    className="bg-surface-container-lowest border border-error/30 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container transition-colors"
                   >
                     <div className="w-10 h-10 rounded-md bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant flex items-center justify-center">
                       {p.imagen ? (
                         <img
                           src={p.imagen}
                           alt={p.nombre}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover grayscale opacity-60"
                         />
                       ) : (
                         <span className="material-symbols-outlined text-on-surface-variant text-lg">
@@ -340,9 +572,8 @@ export const InicioView: React.FC<InicioViewProps> = ({
                       <h3 className="text-xs font-bold text-on-surface truncate">
                         {p.nombre}
                       </h3>
-                      <p className="text-[11px] text-on-surface-variant flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                        Quedan {stock} unidades (mínimo: {p.stockMinimo})
+                      <p className="text-[11px] text-error font-bold flex items-center gap-1">
+                        Agotado (0 unidades)
                       </p>
                     </div>
                     <button
@@ -350,18 +581,62 @@ export const InicioView: React.FC<InicioViewProps> = ({
                         e.stopPropagation();
                         onOpenCompra();
                       }}
-                      className="w-8 h-8 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center text-on-surface hover:text-primary transition-colors"
+                      title="Reponer stock"
+                      className="px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-[16px]">
-                        add_shopping_cart
-                      </span>
+                      Reponer
                     </button>
                   </div>
-                );
-              })}
-            </>
-          )}
-        </div>
+                ))}
+
+                {lowStockProducts.map((p) => {
+                  const stock = getProductTotalStock(p.id, batches);
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => onSelectProduct(p.id)}
+                      className="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-md bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant flex items-center justify-center">
+                        {p.imagen ? (
+                          <img
+                            src={p.imagen}
+                            alt={p.nombre}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="material-symbols-outlined text-on-surface-variant text-lg">
+                            inventory_2
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xs font-bold text-on-surface truncate">
+                          {p.nombre}
+                        </h3>
+                        <p className="text-[11px] text-on-surface-variant flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          Quedan {stock} unidades (mínimo: {p.stockMinimo})
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenCompra();
+                        }}
+                        className="w-8 h-8 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center text-on-surface hover:text-primary transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          add_shopping_cart
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Top Productos */}
@@ -425,6 +700,12 @@ export const InicioView: React.FC<InicioViewProps> = ({
           )}
         </div>
       </section>
+
+      {/* Monthly Financial Calendar Modal */}
+      <CalendarioMesModal
+        isOpen={isCalendarioOpen}
+        onClose={() => setIsCalendarioOpen(false)}
+      />
     </div>
   );
 };

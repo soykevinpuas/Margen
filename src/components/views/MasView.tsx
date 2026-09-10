@@ -1,5 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ExportExcelModal } from '../modals/ExportExcelModal';
+import { GastoHistoricoModal } from '../modals/GastoHistoricoModal';
+import { GananciasHistoricasModal } from '../modals/GananciasHistoricasModal';
+import { CompartirAmigoModal } from '../modals/CompartirAmigoModal';
 
 interface MasViewProps {
   onOpenCompra: () => void;
@@ -10,6 +14,8 @@ interface MasViewProps {
   onOpenAjusteInventario: () => void;
   onOpenConfiguracion: () => void;
   onOpenLanding?: () => void;
+  onOpenGastoHistorico?: () => void;
+  onOpenGananciasHistoricas?: () => void;
 }
 
 export const MasView: React.FC<MasViewProps> = ({
@@ -21,8 +27,14 @@ export const MasView: React.FC<MasViewProps> = ({
   onOpenAjusteInventario,
   onOpenConfiguracion,
   onOpenLanding,
+  onOpenGastoHistorico,
+  onOpenGananciasHistoricas,
 }) => {
   const { settings } = useApp();
+  const [isExcelOpen, setIsExcelOpen] = useState(false);
+  const [isGastoHistoricoOpen, setIsGastoHistoricoOpen] = useState(false);
+  const [isGananciasHistoricasOpen, setIsGananciasHistoricasOpen] = useState(false);
+  const [isCompartirOpen, setIsCompartirOpen] = useState(false);
 
   return (
     <div className="flex flex-col w-full p-4 gap-6 pb-24">
@@ -174,7 +186,80 @@ export const MasView: React.FC<MasViewProps> = ({
                   Gastos Operativos (Detalle)
                 </span>
                 <span className="text-[10px] text-on-surface-variant">
-                  Desglose de egresos no COGS
+                  Desglose de egresos operativos
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-on-surface-variant text-lg">
+              chevron_right
+            </span>
+          </button>
+
+          <button
+            onClick={() => setIsExcelOpen(true)}
+            className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left bg-emerald-500/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <span className="material-symbols-outlined text-lg">description</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                  Exportar a Excel (.xlsx)
+                  <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold rounded-md">OFICIAL</span>
+                </span>
+                <span className="text-[10px] text-on-surface-variant">
+                  Descargar resumen del mes, ventas e inventario con columnas personalizadas
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-emerald-400 text-lg">
+              download
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (onOpenGastoHistorico) onOpenGastoHistorico();
+              else setIsGastoHistoricoOpen(true);
+            }}
+            className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-on-surface">
+                  Gasto Histórico
+                </span>
+                <span className="text-[10px] text-on-surface-variant">
+                  Detalle y acumulado real de todos los egresos y costos de mercancía
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-on-surface-variant text-lg">
+              chevron_right
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (onOpenGananciasHistoricas) onOpenGananciasHistoricas();
+              else setIsGananciasHistoricasOpen(true);
+            }}
+            className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <span className="material-symbols-outlined text-lg">trending_up</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-on-surface">
+                  Ganancias Históricas
+                </span>
+                <span className="text-[10px] text-on-surface-variant">
+                  Utilidad neta real libre y balance mes a mes
                 </span>
               </div>
             </div>
@@ -185,36 +270,35 @@ export const MasView: React.FC<MasViewProps> = ({
         </div>
       </section>
 
-      {/* Configuración & Landing */}
+      {/* Configuración y Difusión */}
       <section className="flex flex-col gap-2">
         <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1">
-          Ajustes y Presentación
+          Ajustes y Difusión
         </span>
 
         <div className="bg-surface-container border border-outline-variant rounded-xl overflow-hidden divide-y divide-outline-variant/30 shadow-sm">
-          {onOpenLanding && (
-            <button
-              onClick={onOpenLanding}
-              className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                  <span className="material-symbols-outlined text-lg">web</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-on-surface">
-                    Ver Landing Page
-                  </span>
-                  <span className="text-[10px] text-on-surface-variant">
-                    Página informativa de presentación
-                  </span>
-                </div>
+          <button
+            onClick={() => setIsCompartirOpen(true)}
+            className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left bg-primary/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                <span className="material-symbols-outlined text-lg">qr_code_2</span>
               </div>
-              <span className="material-symbols-outlined text-on-surface-variant text-lg">
-                chevron_right
-              </span>
-            </button>
-          )}
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                  Compartir con un Amigo
+                  <span className="px-1.5 py-0.2 bg-primary/20 text-primary text-[9px] font-bold rounded-md">QR</span>
+                </span>
+                <span className="text-[10px] text-on-surface-variant">
+                  Genera un código QR y enlace directo a la app/landing
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-primary text-lg">
+              chevron_right
+            </span>
+          </button>
 
           <button
             onClick={onOpenConfiguracion}
@@ -240,6 +324,27 @@ export const MasView: React.FC<MasViewProps> = ({
           </button>
         </div>
       </section>
+
+      <ExportExcelModal
+        isOpen={isExcelOpen}
+        onClose={() => setIsExcelOpen(false)}
+      />
+
+      <GastoHistoricoModal
+        isOpen={isGastoHistoricoOpen}
+        onClose={() => setIsGastoHistoricoOpen(false)}
+      />
+
+      <GananciasHistoricasModal
+        isOpen={isGananciasHistoricasOpen}
+        onClose={() => setIsGananciasHistoricasOpen(false)}
+      />
+
+      <CompartirAmigoModal
+        isOpen={isCompartirOpen}
+        onClose={() => setIsCompartirOpen(false)}
+        onOpenLanding={onOpenLanding}
+      />
     </div>
   );
 };

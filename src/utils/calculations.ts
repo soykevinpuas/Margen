@@ -196,3 +196,24 @@ export function getProductBadges(
 
   return badges.slice(0, 2);
 }
+
+/**
+ * Returns 'YYYY-MM-DD' in local timezone for any valid date input (ISO string, YYYY-MM-DD, or Date object)
+ */
+export function getLocalDateKey(dateInput?: string | Date): string {
+  if (!dateInput) return '';
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    // Only return trimmed directly if it's strictly a plain date string "YYYY-MM-DD" without time component
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+

@@ -13,7 +13,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
   onClose,
   editingProductId,
 }) => {
-  const { categories, products, addProduct, updateProduct, addCategory } = useApp();
+  const { settings, categories, products, addProduct, updateProduct, addCategory } = useApp();
 
   const isEditing = !!editingProductId;
   const existingProduct = isEditing
@@ -24,7 +24,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
   const [categoriaId, setCategoriaId] = useState('');
   const [sku, setSku] = useState('');
   const [precioSugerido, setPrecioSugerido] = useState('');
-  const [stockMinimo, setStockMinimo] = useState<number | string>(2);
+  const [stockMinimo, setStockMinimo] = useState<number | string>(settings.defaultMinStock ?? 3);
   const [imagen, setImagen] = useState('');
 
   // New category creation inline
@@ -47,7 +47,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
         setCategoriaId(defaultCatId);
         setSku('');
         setPrecioSugerido('');
-        setStockMinimo(2);
+        setStockMinimo(settings.defaultMinStock ?? 3);
         setImagen('');
       }
     }

@@ -23,18 +23,11 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 w-full z-40 bg-surface/90 backdrop-blur-xl border-b border-outline-variant/30">
       <div className="h-16 flex items-center justify-between px-4">
         <div className="flex flex-col">
-          <button
-            onClick={onOpenLanding}
-            className="text-left group flex items-center gap-1 hover:opacity-80 transition-opacity"
-            title="Ver Landing Page informativa"
-          >
+          <div className="text-left flex items-center gap-1">
             <span className="text-[10px] uppercase tracking-widest text-primary font-bold">
               {settings.businessName || 'Margen'}
             </span>
-            {onOpenLanding && (
-              <Sparkles className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-            )}
-          </button>
+          </div>
           <h1 className="text-lg font-headline font-bold leading-tight text-on-surface">
             {currentTabTitle}
           </h1>
@@ -64,17 +57,6 @@ export const Header: React.FC<HeaderProps> = ({
               USD
             </button>
           </div>
-
-          {/* Landing quick button */}
-          {onOpenLanding && (
-            <button
-              onClick={onOpenLanding}
-              title="Ver Landing Page"
-              className="px-2 py-1 rounded-lg bg-surface-container border border-outline/30 text-[10px] font-bold text-on-surface-variant hover:text-primary transition-all hidden sm:block"
-            >
-              Landing
-            </button>
-          )}
 
           {/* Auth / Account Badge */}
           {user ? (

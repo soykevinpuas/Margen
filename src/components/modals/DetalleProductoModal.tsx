@@ -28,6 +28,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
     batches,
     sales,
     updateBatchNotes,
+    deletePurchaseBatch,
     deleteProduct,
   } = useApp();
 
@@ -197,7 +198,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                 <span className="material-symbols-outlined text-[16px] text-primary">
                   layers
                 </span>
-                Lotes Activos (FIFO order)
+                Lotes Activos (Orden de Antigüedad)
               </h3>
               <button
                 onClick={() => onOpenNewBatchForProduct(product.id)}
@@ -233,7 +234,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                           </span>
                           {isFirstFifo && (
                             <span className="bg-primary text-on-primary text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
-                              Próximo a salir (FIFO)
+                              Próximo a salir
                             </span>
                           )}
                           {batch.locked && (
@@ -294,18 +295,31 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                           </div>
                         ) : (
                           <>
-                            <span className="italic truncate max-w-[200px]">
+                            <span className="italic truncate max-w-[180px]">
                               Nota: {batch.notas || 'Sin notas'}
                             </span>
-                            <button
-                              onClick={() => {
-                                setEditingBatchNoteId(batch.id);
-                                setTempNoteText(batch.notas || '');
-                              }}
-                              className="text-primary text-[10px] hover:underline ml-1"
-                            >
-                              Editar nota
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingBatchNoteId(batch.id);
+                                  setTempNoteText(batch.notas || '');
+                                }}
+                                className="text-primary text-[10px] hover:underline"
+                              >
+                                Editar nota
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`¿Eliminar el Lote ${batch.id}?`)) {
+                                    const res = deletePurchaseBatch(batch.id);
+                                    if (!res.success) alert(res.message);
+                                  }
+                                }}
+                                className="text-rose-400 text-[10px] hover:underline font-bold"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
                           </>
                         )}
                       </div>
