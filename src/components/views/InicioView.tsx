@@ -34,13 +34,25 @@ export const InicioView: React.FC<InicioViewProps> = ({
   const [showMiniInventory, setShowMiniInventory] = useState(false);
   const [spentPeriod, setSpentPeriod] = useState<'dia' | 'sem' | 'mes'>('mes');
   const [isAlertasOpen, setIsAlertasOpen] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   // Calculate KPIs
   const confirmedSales = sales.filter((s) => s.estado === 'confirmada');
-  const totalSalesCountMonth = confirmedSales.length;
+  const totalSalesCount = confirmedSales.length;
 
   const totalSalesRevenue = confirmedSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
   const totalProfit = confirmedSales.reduce((acc, s) => acc + s.gananciaVentaMXN, 0);
+
+  // KPIs del DIA de HOY (filtra ventas y gastos por la fecha local actual)
+  const todayKey = getLocalDateKey(new Date());
+  const todaySales = confirmedSales.filter((s) => s.fecha && getLocalDateKey(s.fecha) === todayKey);
+  const todayIngresado = todaySales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
+  const todayCostoMercancia = todaySales.reduce((acc, s) => acc + s.costoUnidadesVendidasMXN, 0);
+  const todayGastosOp = operatingExpenses
+    .filter((e) => e.fecha && getLocalDateKey(e.fecha) === todayKey)
+    .reduce((acc, e) => acc + e.montoMXN, 0);
+  const todayGastado = todayCostoMercancia + todayGastosOp;
+  const todayGanancia = todayIngresado - todayGastado;
 
   // Total current inventory value
   const totalInventoryValueMXN = batches.reduce(
@@ -85,7 +97,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
   const totalSpentVal = getSpentForPeriod(spentPeriod);
 
-  // Generate chart data points for Main Profit Card
+  // Generate chart data points for Profit Card (histórico)
   const getProfitChartData = (): ChartDataPoint[] => {
     const now = new Date();
     if (profitChartPeriod === 'dia') {
@@ -170,7 +182,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
     return stock > 0 && stock <= p.stockMinimo;
   });
 
-  // Top Sellers
+  // Top Sellers (histórico por unidades)
   const productSalesMap = new Map<string, number>();
   confirmedSales.forEach((s) => {
     productSalesMap.set(
@@ -188,326 +200,101 @@ export const InicioView: React.FC<InicioViewProps> = ({
     .sort((a, b) => b.qtySold - a.qtySold)
     .slice(0, 2);
 
-  // Real 7-day sales calculation
-  const last7DaysData = Array.from({ length: 7 }).map((_, i) => {
-    const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - i), 12, 0, 0);
-    const dayAbbr = d.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '');
-    const dayCap = dayAbbr.charAt(0).toUpperCase() + dayAbbr.slice(1);
-    const dayNum = String(d.getDate()).padStart(2, '0');
-    const monthNum = String(d.getMonth() + 1).padStart(2, '0');
-    const isToday = i === 6;
-    const dayName = isToday ? `Hoy (${dayNum}/${monthNum})` : `${dayCap} ${dayNum}/${monthNum}`;
-    const dateStr = getLocalDateKey(d);
-
-    const daySalesTotal = confirmedSales.reduce((sum, s) => {
-      const saleDateStr = getLocalDateKey(s.fecha);
-      return saleDateStr === dateStr ? sum + s.ingresoTotalMXN : sum;
-    }, 0);
-
-    return {
-      day: dayName,
-      dateStr,
-      val: daySalesTotal,
-    };
-  });
-
-  const total7DaysSalesVal = last7DaysData.reduce((acc, d) => acc + d.val, 0);
-  const maxDayVal = Math.max(...last7DaysData.map((d) => d.val), 1);
-
   return (
     <div className="flex flex-col w-full px-4 gap-6 pt-2 pb-8">
-      {/* Ribbon Tape Banner ("Modo Cinta") */}
-      <div
-        onClick={() => setIsCalendarioOpen(true)}
-        className="w-full bg-gradient-to-r from-primary/15 via-surface-container-high to-primary/15 border border-primary/40 py-2.5 px-3.5 rounded-xl shadow-md flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-lg transition-all group relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 w-12 h-12 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
-
-        <div className="flex items-center gap-2.5 z-10">
-          <div className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-bold shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
-            <span className="material-symbols-outlined text-lg">calendar_month</span>
-          </div>
-          <div>
-            <div className="text-sm font-bold text-on-surface capitalize">
-              {new Date().toLocaleDateString('es-ES', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </div>
-          </div>
+      {/* 1. KPIs de HOY: Ingresado, Gastado y Ganancia del día actual */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-headline font-bold text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-base">today</span>
+            Hoy
+          </h2>
+          <span className="text-[10px] text-on-surface-variant capitalize">
+            {new Date().toLocaleDateString('es-ES', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1 text-[10px] font-extrabold text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-full group-hover:bg-primary group-hover:text-on-primary transition-all z-10 flex-shrink-0">
-          <span>🗓️ Calendario</span>
-          <span className="material-symbols-outlined text-[12px]">chevron_right</span>
-        </div>
-      </div>
-
-      {/* KPIs Section */}
-      <section className="grid grid-cols-2 gap-3">
-        {/* Ganancia Total (Main Interactive KPI Card) */}
-        <div
-          onClick={() => setShowProfitChart(!showProfitChart)}
-          className="col-span-2 bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-2 relative overflow-hidden group shadow-sm cursor-pointer hover:border-primary/50 transition-all"
-        >
-          <div className="flex items-center justify-between z-10">
-            <div className="flex items-center gap-2 text-on-surface-variant">
-              <span className="material-symbols-outlined text-[18px] text-primary">
-                payments
-              </span>
-              <span className="text-xs font-medium uppercase tracking-wider">
-                Ganancia Total de Ventas
-              </span>
-            </div>
-            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[12px]">
-                {showProfitChart ? 'tag' : 'show_chart'}
-              </span>
-              {showProfitChart ? 'Ver Número' : 'Ver Gráfica'}
+        {/* 3 KPI boxes del día (mismo patrón visual que GraficasView) */}
+        <div className="grid grid-cols-3 gap-2">
+          {/* Ingresado de hoy */}
+          <div className="bg-surface-container-high/60 border border-violet-500/30 rounded-xl p-2 flex flex-col">
+            <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wider">
+              Ingresado
+            </span>
+            <span className="text-sm sm:text-base font-headline font-bold text-on-surface truncate">
+              {formatMoney(todayIngresado, displayCurrency, exchangeRate)}
+            </span>
+            <span className="text-[9px] text-on-surface-variant mt-0.5">
+              {todaySales.length} ventas
             </span>
           </div>
 
-          {!showProfitChart ? (
-            <div>
-              <div className="text-3xl font-headline font-bold text-on-surface z-10 flex items-baseline gap-1">
-                {formatMoney(totalProfit, displayCurrency, exchangeRate)}
-              </div>
-
-              {/* Mini text Ingresado y Gastado */}
-              <div className="flex items-center gap-3 text-[11px] font-bold mt-2 pt-1.5 border-t border-outline-variant/30 z-10">
-                <span className="text-violet-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
-                  Ingresado: {formatMoney(totalSalesRevenue, displayCurrency, exchangeRate)}
-                </span>
-                <span className="text-rose-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                  Gastado: {formatMoney(confirmedSales.reduce((a, s) => a + s.costoUnidadesVendidasMXN, 0) + operatingExpenses.reduce((a, e) => a + e.montoMXN, 0), displayCurrency, exchangeRate)}
-                </span>
-              </div>
-
-              <p className="text-[10px] text-on-surface-variant mt-1.5 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px] text-tertiary">touch_app</span>
-                Toca aquí para transformar esta tarjeta en mini gráfica interactiva
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 pt-1 z-10" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase">
-                  Mini Gráfica ({chartType})
-                </span>
-                {/* Interval selector for mini chart */}
-                <div className="flex bg-surface-container-high rounded-lg p-0.5 border border-outline-variant text-[10px]">
-                  <button
-                    onClick={() => setProfitChartPeriod('dia')}
-                    className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'dia' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
-                  >
-                    Día
-                  </button>
-                  <button
-                    onClick={() => setProfitChartPeriod('sem')}
-                    className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'sem' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
-                  >
-                    Semana
-                  </button>
-                  <button
-                    onClick={() => setProfitChartPeriod('mes')}
-                    className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'mes' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
-                  >
-                    Mes
-                  </button>
-                </div>
-              </div>
-
-              <ChartRenderer
-                data={getProfitChartData()}
-                chartType={chartType}
-                displayCurrency={displayCurrency}
-                exchangeRate={exchangeRate}
-                height={140}
-                showLegend={true}
-                selectedIndex={profitSelectedIndex}
-                onSelectPoint={(idx) => setProfitSelectedIndex(idx)}
-                scrollableDays={profitChartPeriod === 'dia' && chartType === 'barras'}
-              />
-
-              <button
-                onClick={() => setShowProfitChart(false)}
-                className="text-[10px] text-primary font-bold hover:underline self-center pt-1"
-              >
-                ▲ Volver a vista numérica
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Ventas Registradas (Opens Sales History on Vender tab) */}
-        <div
-          onClick={() => onNavigateTab('vender')}
-          className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-tertiary/50 transition-all shadow-sm"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-1 z-10">
-              <div className="flex items-center gap-1.5 text-on-surface-variant">
-                <span className="material-symbols-outlined text-[16px] text-tertiary">shopping_cart</span>
-                <span className="text-[10px] font-medium uppercase tracking-wider">
-                  Ventas Registradas
-                </span>
-              </div>
-              <span className="material-symbols-outlined text-xs text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
-                open_in_new
-              </span>
-            </div>
-            <div className="text-xl font-headline font-bold text-on-surface z-10 mt-1">
-              {totalSalesCountMonth} <span className="text-xs font-normal text-on-surface-variant">ventas</span>
-            </div>
-          </div>
-          <div className="mt-2 text-[10px] text-tertiary font-bold flex items-center gap-1">
-            <span>Historial de Ventas</span>
-            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
-          </div>
-        </div>
-
-        {/* Valor Inventario (Interactive: Toggles mini inventory list) */}
-        <div
-          onClick={() => setShowMiniInventory(!showMiniInventory)}
-          className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-primary/50 transition-all shadow-sm"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-1 z-10">
-              <div className="flex items-center gap-1.5 text-on-surface-variant">
-                <span className="material-symbols-outlined text-[16px] text-primary">inventory_2</span>
-                <span className="text-[10px] font-medium uppercase tracking-wider">
-                  Valor Inventario
-                </span>
-              </div>
-              <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                {showMiniInventory ? 'Valor' : 'Mini List'}
-              </span>
-            </div>
-
-            {!showMiniInventory ? (
-              <div className="text-xl font-headline font-bold text-on-surface z-10 mt-1">
-                {formatMoney(totalInventoryValueMXN, displayCurrency, exchangeRate)}
-              </div>
-            ) : (
-              <div className="mt-1 space-y-1.5 z-10 max-h-28 overflow-y-auto pr-1">
-                {products.length === 0 ? (
-                  <p className="text-[10px] text-on-surface-variant">Sin productos</p>
-                ) : (
-                  products.slice(0, 4).map((p) => {
-                    const st = getProductTotalStock(p.id, batches);
-                    return (
-                      <div key={p.id} className="flex justify-between items-center text-[10px] border-b border-outline-variant/20 pb-1">
-                        <span className="truncate font-medium text-on-surface max-w-[80px]">{p.nombre}</span>
-                        <span className={`font-bold ${st <= p.stockMinimo ? 'text-amber-400' : 'text-primary'}`}>{st} u.</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-          <div className="mt-2 text-[10px] text-on-surface-variant font-medium flex justify-between items-center">
-            <span>{showMiniInventory ? '▲ Volver a Total' : 'Toca para Mini Lista'}</span>
-            <span className="material-symbols-outlined text-[12px]">list_alt</span>
-          </div>
-        </div>
-
-        {/* Nuevo Panel: Total Gastado (Día / Semana / Mes) */}
-        <div className="col-span-2 bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-2 relative shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-on-surface-variant">
-              <span className="material-symbols-outlined text-[18px] text-rose-500">
-                account_balance_wallet
-              </span>
-              <span className="text-xs font-headline font-bold uppercase tracking-wider text-on-surface">
-                Total Gastado
-              </span>
-            </div>
-
-            {/* Selector Día, Semana, Mes */}
-            <div className="flex bg-surface-container-high rounded-lg p-0.5 border border-outline-variant text-[10px]">
-              <button
-                onClick={() => setSpentPeriod('dia')}
-                className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'dia' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
-              >
-                Día
-              </button>
-              <button
-                onClick={() => setSpentPeriod('sem')}
-                className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'sem' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
-              >
-                Semana
-              </button>
-              <button
-                onClick={() => setSpentPeriod('mes')}
-                className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'mes' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
-              >
-                Mes
-              </button>
-            </div>
+          {/* Gastado de hoy */}
+          <div className="bg-surface-container-high/60 border border-rose-500/30 rounded-xl p-2 flex flex-col">
+            <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider">
+              Gastado
+            </span>
+            <span className="text-sm sm:text-base font-headline font-bold text-rose-300 truncate">
+              {formatMoney(todayGastado, displayCurrency, exchangeRate)}
+            </span>
           </div>
 
-          <div className="flex items-baseline justify-between pt-1">
-            <div className="text-2xl font-headline font-bold text-rose-400">
-              {formatMoney(totalSpentVal, displayCurrency, exchangeRate)}
-            </div>
-            <span className="text-[10px] text-on-surface-variant">
-              (Costo mercancía vendida + Gastos op. de {spentPeriod === 'dia' ? 'hoy' : spentPeriod === 'sem' ? 'la semana' : 'este mes'})
+          {/* Ganancia de hoy */}
+          <div className="bg-surface-container-high/60 border border-emerald-500/30 rounded-xl p-2 flex flex-col">
+            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
+              Ganancia
+            </span>
+            <span className={`text-sm sm:text-base font-headline font-bold truncate ${todayGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {formatMoney(todayGanancia, displayCurrency, exchangeRate)}
             </span>
           </div>
         </div>
       </section>
 
-      {/* Quick Actions */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">
-          Acciones Rápidas
-        </h2>
-        <div className="grid grid-cols-3 gap-3">
-          {/* Vender */}
-          <button
-            onClick={() => onNavigateTab('vender')}
-            className="bg-primary hover:bg-primary-container text-on-primary rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-primary/20"
+      {/* 2. Acciones: Vender GIGANTE + Compra y Gasto secundarias */}
+      <section className="flex flex-col gap-2">
+        {/* Botón Vender destacado a todo el ancho */}
+        <button
+          onClick={() => onNavigateTab('vender')}
+          className="w-full bg-primary hover:bg-primary/90 text-on-primary rounded-2xl py-6 px-4 flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-primary/30 col-span-3"
+        >
+          <span
+            className="material-symbols-outlined text-[30px]"
+            style={{ fontVariationSettings: "'FILL' 1" }}
           >
-            <span
-              className="material-symbols-outlined text-[26px]"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              add_circle
-            </span>
-            <span className="text-xs font-bold">Vender</span>
-          </button>
+            add_circle
+          </span>
+          <span className="text-xl font-headline font-bold">Vender</span>
+        </button>
 
-          {/* Agregar Compra */}
+        {/* Compra y Gasto en fila discreta */}
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={onOpenCompra}
-            className="bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all active:scale-95"
+            className="bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface rounded-xl p-3 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
-            <span className="material-symbols-outlined text-[24px] text-primary">
+            <span className="material-symbols-outlined text-[22px] text-primary">
               local_mall
             </span>
-            <span className="text-[11px] font-medium text-center">Compra</span>
+            <span className="text-[11px] font-medium">Compra</span>
           </button>
-
-          {/* Registrar Gasto */}
           <button
             onClick={onOpenGasto}
-            className="bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all active:scale-95"
+            className="bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface rounded-xl p-3 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
-            <span className="material-symbols-outlined text-[24px] text-error">
+            <span className="material-symbols-outlined text-[22px] text-error">
               receipt_long
             </span>
-            <span className="text-[11px] font-medium text-center">Gasto</span>
+            <span className="text-[11px] font-medium">Gasto</span>
           </button>
         </div>
       </section>
 
-      {/* Alertas de Stock Dropdown */}
+      {/* 3. Alertas de Stock (acordeón con contador) */}
       <section className="flex flex-col gap-2">
         <div
           onClick={() => setIsAlertasOpen(!isAlertasOpen)}
@@ -641,7 +428,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
         )}
       </section>
 
-      {/* Top Productos */}
+      {/* 4. Top Ventas */}
       <section className="flex flex-col gap-3">
         <div className="flex justify-between items-center">
           <h2 className="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
@@ -701,6 +488,279 @@ export const InicioView: React.FC<InicioViewProps> = ({
             })
           )}
         </div>
+      </section>
+
+      {/* 5. "Ver más": consultas de baja frecuencia en acordeón */}
+      <section className="flex flex-col gap-2">
+        <div
+          onClick={() => setShowMore(!showMore)}
+          className="w-full bg-surface-container border border-outline-variant hover:border-primary/50 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all shadow-sm group"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined text-base">apps</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-on-surface">Ver más</span>
+              <span className="text-[9px] text-on-surface-variant">
+                Datos del día y análisis
+              </span>
+            </div>
+          </div>
+          <span className="material-symbols-outlined text-on-surface-variant text-lg group-hover:text-primary transition-colors">
+            {showMore ? 'expand_less' : 'expand_more'}
+          </span>
+        </div>
+
+        {showMore && (
+          <div className="flex flex-col gap-4 pt-1 animate-fade-in">
+            {/* Cinta Calendario (antes iba hasta arriba) */}
+            <div
+              onClick={() => setIsCalendarioOpen(true)}
+              className="w-full bg-gradient-to-r from-primary/15 via-surface-container-high to-primary/15 border border-primary/40 py-2.5 px-3.5 rounded-xl shadow-md flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-lg transition-all group relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-12 h-12 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
+
+              <div className="flex items-center gap-2.5 z-10">
+                <div className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-bold shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
+                  <span className="material-symbols-outlined text-lg">calendar_month</span>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-on-surface capitalize">
+                    {new Date().toLocaleDateString('es-ES', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 text-[10px] font-extrabold text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-full group-hover:bg-primary group-hover:text-on-primary transition-all z-10 flex-shrink-0">
+                <span>🗓️ Calendario</span>
+                <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+              </div>
+            </div>
+
+            {/* Ganancia Total histórica (número ⇄ mini gráfica) */}
+            <div
+              onClick={() => setShowProfitChart(!showProfitChart)}
+              className="col-span-2 bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-2 relative overflow-hidden group shadow-sm cursor-pointer hover:border-primary/50 transition-all"
+            >
+              <div className="flex items-center justify-between z-10">
+                <div className="flex items-center gap-2 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[18px] text-primary">
+                    payments
+                  </span>
+                  <span className="text-xs font-medium uppercase tracking-wider">
+                    Ganancia Total (histórica)
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[12px]">
+                    {showProfitChart ? 'tag' : 'show_chart'}
+                  </span>
+                  {showProfitChart ? 'Ver Número' : 'Ver Gráfica'}
+                </span>
+              </div>
+
+              {!showProfitChart ? (
+                <div>
+                  <div className="text-3xl font-headline font-bold text-on-surface z-10 flex items-baseline gap-1">
+                    {formatMoney(totalProfit, displayCurrency, exchangeRate)}
+                  </div>
+
+                  {/* Mini text Ingresado y Gastado */}
+                  <div className="flex items-center gap-3 text-[11px] font-bold mt-2 pt-1.5 border-t border-outline-variant/30 z-10">
+                    <span className="text-violet-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                      Ingresado: {formatMoney(totalSalesRevenue, displayCurrency, exchangeRate)}
+                    </span>
+                    <span className="text-rose-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                      Gastado: {formatMoney(confirmedSales.reduce((a, s) => a + s.costoUnidadesVendidasMXN, 0) + operatingExpenses.reduce((a, e) => a + e.montoMXN, 0), displayCurrency, exchangeRate)}
+                    </span>
+                  </div>
+
+                  <p className="text-[10px] text-on-surface-variant mt-1.5 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px] text-tertiary">touch_app</span>
+                    Toca aquí para transformar esta tarjeta en mini gráfica interactiva
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 pt-1 z-10" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">
+                      Mini Gráfica ({chartType})
+                    </span>
+                    {/* Interval selector for mini chart */}
+                    <div className="flex bg-surface-container-high rounded-lg p-0.5 border border-outline-variant text-[10px]">
+                      <button
+                        onClick={() => setProfitChartPeriod('dia')}
+                        className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'dia' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+                      >
+                        Día
+                      </button>
+                      <button
+                        onClick={() => setProfitChartPeriod('sem')}
+                        className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'sem' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+                      >
+                        Semana
+                      </button>
+                      <button
+                        onClick={() => setProfitChartPeriod('mes')}
+                        className={`px-2 py-0.5 font-bold rounded ${profitChartPeriod === 'mes' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+                      >
+                        Mes
+                      </button>
+                    </div>
+                  </div>
+
+                  <ChartRenderer
+                    data={getProfitChartData()}
+                    chartType={chartType}
+                    displayCurrency={displayCurrency}
+                    exchangeRate={exchangeRate}
+                    height={140}
+                    showLegend={true}
+                    selectedIndex={profitSelectedIndex}
+                    onSelectPoint={(idx) => setProfitSelectedIndex(idx)}
+                    scrollableDays={profitChartPeriod === 'dia' && chartType === 'barras'}
+                  />
+
+                  <button
+                    onClick={() => setShowProfitChart(false)}
+                    className="text-[10px] text-primary font-bold hover:underline self-center pt-1"
+                  >
+                    ▲ Volver a vista numérica
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Ventas Registradas + Valor Inventario en par */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Ventas Registradas (Opens Sales History on Vender tab) */}
+              <div
+                onClick={() => onNavigateTab('vender')}
+                className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-tertiary/50 transition-all shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1 z-10">
+                    <div className="flex items-center gap-1.5 text-on-surface-variant">
+                      <span className="material-symbols-outlined text-[16px] text-tertiary">shopping_cart</span>
+                      <span className="text-[10px] font-medium uppercase tracking-wider">
+                        Ventas Registradas
+                      </span>
+                    </div>
+                    <span className="material-symbols-outlined text-xs text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+                      open_in_new
+                    </span>
+                  </div>
+                  <div className="text-xl font-headline font-bold text-on-surface z-10 mt-1">
+                    {totalSalesCount} <span className="text-xs font-normal text-on-surface-variant">ventas</span>
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-tertiary font-bold flex items-center gap-1">
+                  <span>Historial de Ventas</span>
+                  <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+                </div>
+              </div>
+
+              {/* Valor Inventario (Interactive: Toggles mini inventory list) */}
+              <div
+                onClick={() => setShowMiniInventory(!showMiniInventory)}
+                className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-primary/50 transition-all shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1 z-10">
+                    <div className="flex items-center gap-1.5 text-on-surface-variant">
+                      <span className="material-symbols-outlined text-[16px] text-primary">inventory_2</span>
+                      <span className="text-[10px] font-medium uppercase tracking-wider">
+                        Valor Inventario
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                      {showMiniInventory ? 'Valor' : 'Mini List'}
+                    </span>
+                  </div>
+
+                  {!showMiniInventory ? (
+                    <div className="text-xl font-headline font-bold text-on-surface z-10 mt-1">
+                      {formatMoney(totalInventoryValueMXN, displayCurrency, exchangeRate)}
+                    </div>
+                  ) : (
+                    <div className="mt-1 space-y-1.5 z-10 max-h-28 overflow-y-auto pr-1">
+                      {products.length === 0 ? (
+                        <p className="text-[10px] text-on-surface-variant">Sin productos</p>
+                      ) : (
+                        products.slice(0, 4).map((p) => {
+                          const st = getProductTotalStock(p.id, batches);
+                          return (
+                            <div key={p.id} className="flex justify-between items-center text-[10px] border-b border-outline-variant/20 pb-1">
+                              <span className="truncate font-medium text-on-surface max-w-[80px]">{p.nombre}</span>
+                              <span className={`font-bold ${st <= p.stockMinimo ? 'text-amber-400' : 'text-primary'}`}>{st} u.</span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 text-[10px] text-on-surface-variant font-medium flex justify-between items-center">
+                  <span>{showMiniInventory ? '▲ Volver a Total' : 'Toca para Mini Lista'}</span>
+                  <span className="material-symbols-outlined text-[12px]">list_alt</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Total Gastado (Día / Semana / Mes) */}
+            <div className="col-span-2 bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-2 relative shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[18px] text-rose-500">
+                    account_balance_wallet
+                  </span>
+                  <span className="text-xs font-headline font-bold uppercase tracking-wider text-on-surface">
+                    Total Gastado
+                  </span>
+                </div>
+
+                {/* Selector Día, Semana, Mes */}
+                <div className="flex bg-surface-container-high rounded-lg p-0.5 border border-outline-variant text-[10px]">
+                  <button
+                    onClick={() => setSpentPeriod('dia')}
+                    className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'dia' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
+                  >
+                    Día
+                  </button>
+                  <button
+                    onClick={() => setSpentPeriod('sem')}
+                    className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'sem' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
+                  >
+                    Semana
+                  </button>
+                  <button
+                    onClick={() => setSpentPeriod('mes')}
+                    className={`px-2 py-0.5 font-bold rounded transition-all ${spentPeriod === 'mes' ? 'bg-rose-500 text-white' : 'text-on-surface-variant'}`}
+                  >
+                    Mes
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-baseline justify-between pt-1">
+                <div className="text-2xl font-headline font-bold text-rose-400">
+                  {formatMoney(totalSpentVal, displayCurrency, exchangeRate)}
+                </div>
+                <span className="text-[10px] text-on-surface-variant">
+                  (Costo mercancía vendida + Gastos op. de {spentPeriod === 'dia' ? 'hoy' : spentPeriod === 'sem' ? 'la semana' : 'este mes'})
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Monthly Financial Calendar Modal */}
