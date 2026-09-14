@@ -33,6 +33,27 @@ import {
 } from '../data/seedData';
 import { calculateFifoAllocation, getLocalDateKey } from '../utils/calculations';
 
+// Fila importada desde Excel (ya validada en el modal)
+export interface ImportRow {
+  nombre: string;
+  categoriaNombre: string;
+  cantidad: number;
+  costoUnitarioMXN: number;
+  precioSugerido?: number;
+  stockMinimo: number;
+  fecha: string; // YYYY-MM-DD
+}
+
+// Resultado del import atómico con writeBatch
+export interface ImportResult {
+  ok: boolean;
+  creadosProductos: number;
+  creadosLotes: number;
+  creadasCategorias: number;
+  errores: string[];
+  mensaje: string;
+}
+
 interface AppContextType {
   settings: AppSettings;
   categories: Category[];
@@ -103,6 +124,7 @@ interface AppContextType {
   updateBatchDate: (batchId: string, newFecha: string) => void;
   resetToSeedData: () => void;
   clearAllData: () => Promise<void>;
+  importExcel: (rows: ImportRow[]) => Promise<ImportResult>;
 }
 
 const LOCAL_STORAGE_KEY = 'margen_app_state_v1';
@@ -378,28 +400,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_adjustments`, JSON.stringify(adjustments));
   }, [adjustments, user]);
 
-  // Helper to remove undefined properties before sending to Firestore
-  const safeSetDoc = (docRef: any, data: any) => {
-    const cleanForFirestore = (obj: any): any => {
-      if (obj === null || obj === undefined) return null;
-      if (Array.isArray(obj)) {
-        return obj.map((item) => cleanForFirestore(item));
-      }
-      if (typeof obj === 'object') {
-        const cleaned: Record<string, any> = {};
-        for (const key of Object.keys(obj)) {
-          if (obj[key] !== undefined) {
-            cleaned[key] = cleanForFirestore(obj[key]);
-          }
+  // Quita propiedades undefined antes de mandar datos a Firestore
+  const cleanForFirestore = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (Array.isArray(obj)) {
+      return obj.map((item) => cleanForFirestore(item));
+    }
+    if (typeof obj === 'object') {
+      const cleaned: Record<string, any> = {};
+      for (const key of Object.keys(obj)) {
+        if (obj[key] !== undefined) {
+          cleaned[key] = cleanForFirestore(obj[key]);
         }
-        return cleaned;
       }
-      return obj;
-    };
-    return setDoc(docRef, cleanForFirestore(data)).catch((err) =>
+      return cleaned;
+    }
+    return obj;
+  };
+
+  const safeSetDoc = (docRef: any, data: any) =>
+    setDoc(docRef, cleanForFirestore(data)).catch((err) =>
       console.error('Firestore setDoc error:', err)
     );
-  };
 
   // Actions
   const updateSettings = (newSettings: Partial<AppSettings>) => {
@@ -887,6 +909,220 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Importa productos y lotes desde una hoja Excel validada (atómico con writeBatch)
+  const importExcel = async (rows: ImportRow[]): Promise<ImportResult> => {
+    const nulos: ImportResult = {
+      ok: false,
+      creadosProductos: 0,
+      creadosLotes: 0,
+      creadasCategorias: 0,
+      errores: [],
+      mensaje: '',
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return { ...nulos, mensaje: 'No hay conexión a internet. El import requiere conexión.' };
+    }
+    if (!user) {
+      return { ...nulos, mensaje: 'Debes iniciar sesión para importar desde Excel.' };
+    }
+
+    const now = new Date().toISOString();
+    const todayKey = getLocalDateKey(new Date());
+    const errores: string[] = [];
+    const norm = (s: string) => s.trim().toLowerCase();
+
+    // Índices por nombre (trim + case-insensitive) para resolver duplicados
+    const productsByName = new Map<string, Product[]>();
+    products.forEach((p) => {
+      const key = norm(p.nombre);
+      if (!productsByName.has(key)) productsByName.set(key, []);
+      productsByName.get(key)!.push(p);
+    });
+    const categoriesByName = new Map<string, Category>();
+    categories.forEach((c) => categoriesByName.set(norm(c.nombre), c));
+
+    const categoriasNuevas: Category[] = [];
+    const productosNuevos: Product[] = [];
+    const productosReactivados: Product[] = [];
+    const lotesNuevos: PurchaseBatch[] = [];
+
+    // Busca o crea la categoría (creada con id único por índice de fila)
+    const getCategory = (nombreRaw: string, idx: number): Category => {
+      const nombre = (nombreRaw || '').trim() || 'General';
+      const key = norm(nombre);
+      const existente = categoriesByName.get(key);
+      if (existente) return existente;
+      const nueva: Category = {
+        id: `cat-${Date.now()}-${idx}`,
+        nombre,
+        archived: false,
+        createdAt: now,
+      };
+      categoriesByName.set(key, nueva);
+      categoriasNuevas.push(nueva);
+      return nueva;
+    };
+
+    rows.forEach((row, idx) => {
+      const fila = `Fila ${idx + 2}: `;
+      // Re-valida lo esencial: nombre, cantidad, costo y fecha
+      const nombre = (row.nombre || '').trim();
+      if (!nombre || nombre.length > 120) {
+        errores.push(`${fila} nombre vacío o demasiado largo.`);
+        return;
+      }
+      const cantidad = Math.floor(Number(row.cantidad));
+      if (!Number.isFinite(cantidad) || cantidad < 1 || cantidad > 10000) {
+        errores.push(`${fila} cantidad inválida (entero entre 1 y 10.000).`);
+        return;
+      }
+      const costo = Number(row.costoUnitarioMXN);
+      if (!Number.isFinite(costo) || costo < 0) {
+        errores.push(`${fila} costo unitario inválido (número ≥ 0).`);
+        return;
+      }
+      const fecha = row.fecha || todayKey;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        errores.push(`${fila} fecha de compra inválida.`);
+        return;
+      }
+
+      // Ambigüedad: varios productos con el mismo nombre → no se importa esa fila
+      const coincidencias = productsByName.get(norm(nombre)) || [];
+      if (coincidencias.length > 1) {
+        errores.push(
+          `${fila} "${nombre}" coincide con varios productos del catálogo; no se importó.`
+        );
+        return;
+      }
+
+      const categoria = getCategory(row.categoriaNombre, idx);
+      let productoId: string;
+      const existente = coincidencias[0];
+
+      if (existente) {
+        productoId = existente.id;
+        if (existente.archivado) {
+          productosReactivados.push({ ...existente, archivado: false });
+        }
+      } else {
+        productoId = `prod-${Date.now()}-${idx}`;
+        const stockMinimo =
+          Number.isFinite(row.stockMinimo) && row.stockMinimo >= 0
+            ? Math.floor(row.stockMinimo)
+            : 3;
+        const nuevoProducto: Product = {
+          id: productoId,
+          nombre,
+          categoriaId: categoria.id,
+          stockMinimo,
+          precioSugerido:
+            Number.isFinite(row.precioSugerido) && row.precioSugerido >= 0
+              ? row.precioSugerido
+              : undefined,
+          archivado: false,
+          createdAt: now,
+        };
+        productosNuevos.push(nuevoProducto);
+        productsByName.set(norm(nombre), [...coincidencias, nuevoProducto]);
+      }
+
+      // Un lote por fila con el mismo cálculo que addPurchaseBatch
+      const costoProductosMXN = cantidad * costo;
+      const nuevoLote: PurchaseBatch = {
+        id: `L-${Date.now()}-${idx}`,
+        productoId,
+        cantidadComprada: cantidad,
+        cantidadDisponible: cantidad,
+        costoProductoUnitarioMXN: costo,
+        costoProductosMXN,
+        gastosDeCompra: [],
+        costoTotalMXN: costoProductosMXN,
+        costoUnitarioRealMXN: costoProductosMXN / cantidad,
+        fecha,
+        esInventarioInicial: false,
+        locked: false,
+        createdAt: now,
+      };
+      lotesNuevos.push(nuevoLote);
+    });
+
+    const totalWrites =
+      categoriasNuevas.length +
+      productosNuevos.length +
+      productosReactivados.length +
+      lotesNuevos.length;
+
+    if (totalWrites === 0) {
+      return {
+        ...nulos,
+        errores,
+        mensaje: 'No se importó ninguna fila válida. Revisa los errores e inténtalo de nuevo.',
+      };
+    }
+    // Límite de escrituras del writeBatch de Firestore (500)
+    if (totalWrites > 500) {
+      return {
+        ...nulos,
+        errores: [...errores, `${totalWrites} escrituras superan el límite de 500 por lote.`],
+        mensaje: 'Demasiadas filas para un import atómico. Parte el archivo o reusa categorías.',
+      };
+    }
+
+    // Commitea TODO en un solo writeBatch (atómico: o todo o nada)
+    try {
+      const b = writeBatch(db);
+      categoriasNuevas.forEach((c) =>
+        b.set(doc(db, 'users', user.uid, 'categories', c.id), cleanForFirestore(c))
+      );
+      productosNuevos.forEach((p) =>
+        b.set(doc(db, 'users', user.uid, 'products', p.id), cleanForFirestore(p))
+      );
+      productosReactivados.forEach((p) =>
+        b.set(doc(db, 'users', user.uid, 'products', p.id), cleanForFirestore(p))
+      );
+      lotesNuevos.forEach((l) =>
+        b.set(doc(db, 'users', user.uid, 'batches', l.id), cleanForFirestore(l))
+      );
+      await b.commit();
+    } catch (err) {
+      // Si falla, NO se toca el estado local: solo se reporta el error
+      console.error('Firestore importExcel error:', err);
+      return {
+        ...nulos,
+        errores,
+        mensaje: 'Error al guardar en Firestore. No se importó nada.',
+      };
+    }
+
+    // El commit fue exitoso: recién aquí se aplica al estado local
+    setCategories((prev) => [...prev, ...categoriasNuevas]);
+    if (productosNuevos.length > 0) {
+      setProducts((prev) => [...prev, ...productosNuevos]);
+    }
+    if (productosReactivados.length > 0) {
+      setProducts((prev) =>
+        prev.map((p) => {
+          const reac = productosReactivados.find((r) => r.id === p.id);
+          return reac || p;
+        })
+      );
+    }
+    setBatches((prev) => [...lotesNuevos, ...prev]);
+
+    return {
+      ok: true,
+      creadosProductos: productosNuevos.length,
+      creadosLotes: lotesNuevos.length,
+      creadasCategorias: categoriasNuevas.length,
+      errores,
+      mensaje: `Import completado: ${productosNuevos.length} productos nuevos, ${lotesNuevos.length} lotes y ${categoriasNuevas.length} categorías.${
+        errores.length > 0 ? ` ${errores.length} fila(s) omitida(s).` : ''
+      }`,
+    };
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -915,6 +1151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addInventoryAdjustment,
         resetToSeedData,
         clearAllData,
+        importExcel,
       }}
     >
       {children}

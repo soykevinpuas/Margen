@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Product, PurchaseBatch } from '../../types';
+import { ImportExcelModal } from '../modals/ImportExcelModal';
 import {
   formatMoney,
   getProductTotalStock,
@@ -33,6 +34,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'productos' | 'compras' | 'agotados'>('productos');
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Editing batch state
   const [editingBatch, setEditingBatch] = useState<PurchaseBatch | null>(null);
@@ -394,12 +396,21 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               <span className="material-symbols-outlined text-[16px]">history_edu</span>
               Lotes de Mercancía Comprada
             </h2>
-            <button
-              onClick={onOpenCompra}
-              className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
-            >
-              + Nueva Compra
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsImportOpen(true)}
+                className="px-3 py-1.5 bg-surface-container-highest border border-outline-variant text-on-surface font-bold text-xs rounded-lg flex items-center gap-1 hover:bg-surface-variant transition-colors"
+              >
+                <span className="material-symbols-outlined text-[14px]">file_upload</span>
+                Importar Excel
+              </button>
+              <button
+                onClick={onOpenCompra}
+                className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
+              >
+                + Nueva Compra
+              </button>
+            </div>
           </div>
 
           {filteredBatches.length === 0 ? (
@@ -754,6 +765,11 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
       >
         <span className="material-symbols-outlined text-[28px]">add</span>
       </button>
+
+      <ImportExcelModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+      />
     </div>
   );
 };

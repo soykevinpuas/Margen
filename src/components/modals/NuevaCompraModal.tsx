@@ -16,7 +16,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
   preselectedProductId,
   onOpenNuevoProducto,
 }) => {
-  const { settings, products, addPurchaseBatch } = useApp();
+  const { settings, products, categories, addProduct, addCategory, addPurchaseBatch } = useApp();
   const { displayCurrency, exchangeRate } = settings;
 
   const activeProducts = products.filter((p) => !p.archivado);
@@ -37,6 +37,12 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
   const [supplier, setSupplier] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isInitialInventory, setIsInitialInventory] = useState<boolean>(false);
+
+  // Alta rápida: modo y campos del mini-formulario
+  const [modo, setModo] = useState<'existente' | 'rapido'>('existente');
+  const [rapidoNombre, setRapidoNombre] = useState('');
+  const [rapidoCantidad, setRapidoCantidad] = useState<string | number>(1);
+  const [rapidoCosto, setRapidoCosto] = useState('');
 
   const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
   const [lastPurchaseInfo, setLastPurchaseInfo] = useState<{
@@ -62,6 +68,10 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
     setIsInitialInventory(false);
     setIsConfirmed(false);
     setLastPurchaseInfo(null);
+    setModo('existente');
+    setRapidoNombre('');
+    setRapidoCantidad(1);
+    setRapidoCosto('');
   };
 
   // Synchronize selectedProductId and reset fields when modal opens
@@ -137,25 +147,85 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   };
 
-  // Real Cost Calculations
-  const numericQty = Math.max(1, parseInt(String(quantity)) || 1);
+// Real Cost Calculations
+  const numericQty = Math.max(1, parseInt(String(quantity), 10) || 1);
+  const numericUnitCost = parseFloat(unitCost) || 0;
   const numericProductTotal = parseFloat(totalProductCost) || 0;
   const numericExpensesTotal = expenses.reduce(
     (acc, e) => acc + (e.montoMXN || 0),
     0
   );
 
-  const realTotalCostMXN = numericProductTotal + numericExpensesTotal;
-  const realUnitCostMXN = numericQty > 0 ? realTotalCostMXN / numericQty : 0;
+  // En modo rápido los totales salen de los campos del alta rápida
+  const effectiveQty =
+    modo === 'rapido'
+      ? Math.max(1, parseInt(String(rapidoCantidad), 10) || 1)
+      : numericQty;
+  const effectiveUnitCost = modo === 'rapido' ? parseFloat(rapidoCosto) || 0 : numericUnitCost;
+  const effectiveProductTotal =
+    modo === 'rapido' ? effectiveQty * effectiveUnitCost : numericProductTotal;
+
+  const realTotalCostMXN = effectiveProductTotal + numericExpensesTotal;
+  const realUnitCostMXN = effectiveQty > 0 ? realTotalCostMXN / effectiveQty : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (modo === 'rapido') {
+      const nombre = rapidoNombre.trim();
+      if (!nombre) return;
+      if (effectiveQty < 1) return;
+      if (effectiveUnitCost <= 0) return;
+      if (realTotalCostMXN <= 0) return;
+
+      // Busca la categoría "General" o créala con la acción del contexto (nunca un id fantasma)
+      let categoriaGeneral =
+        categories.find((c) => !c.archived && c.nombre.trim().toLowerCase() === 'general');
+      if (!categoriaGeneral) {
+        categoriaGeneral = addCategory('General');
+      }
+      const nuevo = addProduct({
+        nombre,
+        categoriaId: categoriaGeneral.id,
+        stockMinimo: settings.defaultMinStock ?? 3,
+        precioSugerido: Math.round(effectiveUnitCost * 2 * 100) / 100,
+      });
+
+      const nuevoLote = addPurchaseBatch({
+        productoId: nuevo.id,
+        cantidadComprada: effectiveQty,
+        costoProductoUnitarioMXN: effectiveUnitCost,
+        gastosDeCompra: expenses.filter((e) => e.montoMXN > 0),
+        fecha: date,
+        proveedor: supplier,
+        notas: notes,
+        esInventarioInicial: isInitialInventory,
+      });
+
+      if (nuevoLote && nuevoLote.id) {
+        setLastPurchaseInfo({
+          productName: nuevo.nombre,
+          quantity: effectiveQty,
+          realTotalCostMXN,
+          realUnitCostMXN,
+          supplier,
+          expenses: expenses.filter((e) => e.montoMXN > 0),
+          isInitialInventory,
+          date,
+        });
+        setIsConfirmed(true);
+      } else {
+        onClose();
+      }
+      return;
+    }
+
+    // Modo existente: flujo original
     if (!selectedProductId) return;
 
-    const numericUnitCost = parseFloat(unitCost) || 0;
     const selectedProd = products.find((p) => p.id === selectedProductId);
 
-    const res = addPurchaseBatch({
+    const nuevoLote = addPurchaseBatch({
       productoId: selectedProductId,
       cantidadComprada: numericQty,
       costoProductoUnitarioMXN: numericUnitCost,
@@ -166,7 +236,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
       esInventarioInicial: isInitialInventory,
     });
 
-    if (res.success) {
+    if (nuevoLote && nuevoLote.id) {
       setLastPurchaseInfo({
         productName: selectedProd ? selectedProd.nombre : 'Producto',
         quantity: numericQty,
@@ -191,6 +261,9 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
     setSupplier('');
     setNotes('');
     setIsInitialInventory(false);
+    setRapidoNombre('');
+    setRapidoCantidad(1);
+    setRapidoCosto('');
   };
 
   return (
@@ -332,61 +405,150 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
             onSubmit={handleSubmit}
             className="p-4 space-y-4 overflow-y-auto flex-1 text-xs"
           >
-            {/* Select Product */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">
-                Producto *
-              </label>
-              {onOpenNuevoProducto && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenNuevoProducto();
-                  }}
-                  className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[13px]">add_box</span>
-                  + Crear Nuevo Producto
-                </button>
-              )}
+            <div className="space-y-1.5">
+            {/* Toggle: elegir existente | alta rápida */}
+            <div className="flex bg-surface-container-high/80 border border-outline-variant/60 rounded-lg p-1 gap-1 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setModo('existente')}
+                className={`flex-1 py-1.5 px-2 rounded-md font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                  modo === 'existente'
+                    ? 'bg-primary text-on-primary shadow-md border border-primary/40'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[14px]">checklist</span>
+                Elegir existente
+              </button>
+              <button
+                type="button"
+                onClick={() => setModo('rapido')}
+                className={`flex-1 min-w-[110px] py-1.5 px-2 rounded-md font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                  modo === 'rapido'
+                    ? 'bg-primary text-on-primary shadow-md border border-primary/40'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[14px]">bolt</span>
+                + Alta rápida
+              </button>
             </div>
 
-            {activeProducts.length === 0 ? (
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
-                <p className="text-amber-400 font-bold text-xs">
-                  No tienes ningún producto creado en tu inventario.
-                </p>
-                <p className="text-on-surface-variant text-[11px]">
-                  Para registrar una compra, primero debes agregar un producto al catálogo.
-                </p>
-                {onOpenNuevoProducto && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onOpenNuevoProducto();
-                    }}
-                    className="w-full py-2 bg-emerald-500 text-slate-950 font-extrabold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-md"
-                  >
-                    <span className="material-symbols-outlined text-sm">add</span>
-                    Crear Primer Producto Ahora
-                  </button>
+            {modo === 'rapido' ? (
+              <div className="bg-surface-container border border-outline-variant rounded-xl p-3 space-y-3">
+                <div>
+                  <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] mb-1">
+                    Nombre del producto nuevo *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Caja de 12 plumas"
+                    value={rapidoNombre}
+                    onChange={(e) => setRapidoNombre(e.target.value)}
+                    className="w-full h-9 bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg px-3 text-xs focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-on-surface-variant mb-1">
+                      Cantidad *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={rapidoCantidad}
+                      onChange={(e) => setRapidoCantidad(e.target.value)}
+                      onBlur={() => {
+                        const parsed = parseInt(String(rapidoCantidad), 10);
+                        if (isNaN(parsed) || parsed < 1) setRapidoCantidad(1);
+                      }}
+                      className="w-full h-9 bg-surface-container-lowest border border-outline-variant text-on-surface px-3 rounded-lg font-bold text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-on-surface-variant mb-1">
+                      Costo unitario ($) *
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-2.5 text-on-surface-variant text-xs">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={rapidoCosto}
+                        onChange={(e) => setRapidoCosto(e.target.value)}
+                        className="w-full h-9 bg-surface-container-lowest border border-outline-variant text-on-surface pl-6 pr-2 text-right font-bold text-xs focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {effectiveUnitCost <= 0 && rapidoNombre.trim() !== '' && (
+                  <p className="text-[10px] font-bold text-error">
+                    El costo debe ser mayor a 0 para crear el producto y su precio sugerido.
+                  </p>
                 )}
+                <p className="text-[10px] text-on-surface-variant">
+                  Se creará en categoría General, stock mínimo {settings.defaultMinStock ?? 3} y precio de
+                  venta sugerido = costo × 2.
+                </p>
               </div>
             ) : (
-              <select
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-                className="w-full h-10 bg-surface-container border border-outline-variant text-on-surface font-bold rounded-lg px-3 text-xs focus:outline-none focus:border-primary"
-              >
-                {activeProducts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} {p.sku ? `(${p.sku})` : ''}
-                  </option>
-                ))}
-              </select>
+              <>
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">
+                    Producto *
+                  </label>
+                  {onOpenNuevoProducto && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenNuevoProducto();
+                      }}
+                      className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">add_box</span>
+                      + Crear Nuevo Producto
+                    </button>
+                  )}
+                </div>
+
+                {activeProducts.length === 0 ? (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+                    <p className="text-amber-400 font-bold text-xs">
+                      No tienes ningún producto creado en tu inventario.
+                    </p>
+                    <p className="text-on-surface-variant text-[11px]">
+                      Para registrar una compra, primero debes agregar un producto al catálogo.
+                    </p>
+                    {onOpenNuevoProducto && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenNuevoProducto();
+                        }}
+                        className="w-full py-2 bg-emerald-500 text-slate-950 font-extrabold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-md"
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        Crear Primer Producto Ahora
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    className="w-full h-10 bg-surface-container border border-outline-variant text-on-surface font-bold rounded-lg px-3 text-xs focus:outline-none focus:border-primary"
+                  >
+                    {activeProducts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre} {p.sku ? `(${p.sku})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
             )}
           </div>
 
@@ -616,7 +778,11 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={!selectedProductId || realTotalCostMXN <= 0}
+              disabled={
+                modo === 'rapido'
+                  ? rapidoNombre.trim() === '' || effectiveQty < 1 || realTotalCostMXN <= 0
+                  : !selectedProductId || realTotalCostMXN <= 0
+              }
               className="w-full py-3 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:opacity-95 active:scale-95 transition-all text-xs flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
             >
               <span className="material-symbols-outlined text-base">
