@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { formatMoney } from '../utils/calculations';
 import { Currency } from '../types';
 
@@ -33,6 +33,18 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
   onSelectPoint,
   scrollableDays = false,
 }) => {
+  const barAreaRef = useRef<HTMLDivElement>(null);
+
+  // Al abrir, muestra la columna de HOY (extremo derecho)
+  useEffect(() => {
+    if (!scrollableDays) return;
+    requestAnimationFrame(() => {
+      if (barAreaRef.current) {
+        barAreaRef.current.scrollLeft = barAreaRef.current.scrollWidth;
+      }
+    });
+  }, [scrollableDays, data.length]);
+
   const totalIngresos = data.reduce((acc, d) => acc + d.ingresos, 0);
   const totalGastos = data.reduce((acc, d) => acc + d.gastos, 0);
   const totalGananciaReal = data.reduce((acc, d) => acc + d.gananciaReal, 0);
@@ -65,6 +77,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
     <div className="w-full flex flex-col gap-3">
       {/* GRAPH RENDER AREA */}
       <div
+        ref={barAreaRef}
         className={`w-full relative flex items-end justify-between gap-1 pt-4 pb-2 px-1 bg-surface-container-lowest/30 rounded-xl border border-outline-variant/30 ${scrollableDays ? 'overflow-x-auto snap-x snap-mandatory' : 'overflow-hidden'}`}
         style={{ height: `${height}px` }}
       >

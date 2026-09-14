@@ -110,14 +110,14 @@ export const GraficasView: React.FC = () => {
   const getChartPoints = (): ChartDataPoint[] => {
     const now = new Date();
     if (period === 'dia') {
-      // Últimos 30 días: índice 0 = HOY (izquierda), índice 29 = más antiguo (derecha)
+      // Últimos 30 días: índice 29 = HOY (derecha), índice 0 = más antiguo (izquierda)
       return Array.from({ length: 30 }).map((_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 12, 0, 0);
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i), 12, 0, 0);
         const dayAbbr = d.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '');
         const dayName = dayAbbr.charAt(0).toUpperCase() + dayAbbr.slice(1);
         const dayNum = String(d.getDate()).padStart(2, '0');
         const monthNum = String(d.getMonth() + 1).padStart(2, '0');
-        const isToday = i === 0;
+        const isToday = i === 29;
         const label = isToday ? `Hoy (${dayNum}/${monthNum})` : `${dayName} ${dayNum}/${monthNum}`;
         const dateStr = getLocalDateKey(d);
 

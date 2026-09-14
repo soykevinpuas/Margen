@@ -38,21 +38,21 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
   // Calculate KPIs
   const confirmedSales = sales.filter((s) => s.estado === 'confirmada');
-  const totalSalesCount = confirmedSales.length;
 
-  const totalSalesRevenue = confirmedSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
-  const totalProfit = confirmedSales.reduce((acc, s) => acc + s.gananciaVentaMXN, 0);
+  // ¿La fecha pertenece al mes actual? (compara el prefijo YYYY-MM de la clave local)
+  const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const isThisMonth = (fecha?: string | Date) =>
+    !!fecha && getLocalDateKey(fecha).startsWith(currentMonthKey);
 
-  // KPIs del DIA de HOY (filtra ventas y gastos por la fecha local actual)
-  const todayKey = getLocalDateKey(new Date());
-  const todaySales = confirmedSales.filter((s) => s.fecha && getLocalDateKey(s.fecha) === todayKey);
-  const todayIngresado = todaySales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
-  const todayCostoMercancia = todaySales.reduce((acc, s) => acc + s.costoUnidadesVendidasMXN, 0);
-  const todayGastosOp = operatingExpenses
-    .filter((e) => e.fecha && getLocalDateKey(e.fecha) === todayKey)
+  // KPIs del MES actual (ventas y gastos del mes en curso)
+  const monthSales = confirmedSales.filter((s) => s.fecha && isThisMonth(s.fecha));
+  const monthIngresado = monthSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
+  const monthCostoMercancia = monthSales.reduce((acc, s) => acc + s.costoUnidadesVendidasMXN, 0);
+  const monthGastosOp = operatingExpenses
+    .filter((e) => e.fecha && isThisMonth(e.fecha))
     .reduce((acc, e) => acc + e.montoMXN, 0);
-  const todayGastado = todayCostoMercancia + todayGastosOp;
-  const todayGanancia = todayIngresado - todayGastado;
+  const monthGastado = monthCostoMercancia + monthGastosOp;
+  const monthGanancia = monthIngresado - monthGastado;
 
   // Total current inventory value
   const totalInventoryValueMXN = batches.reduce(
@@ -101,13 +101,13 @@ export const InicioView: React.FC<InicioViewProps> = ({
   const getProfitChartData = (): ChartDataPoint[] => {
     const now = new Date();
     if (profitChartPeriod === 'dia') {
-      // Últimos 30 días: índice 0 = HOY (izquierda), índice 29 = más antiguo (derecha)
+      // Últimos 30 días: índice 29 = HOY (derecha), índice 0 = más antiguo (izquierda)
       return Array.from({ length: 30 }).map((_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 12, 0, 0);
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i), 12, 0, 0);
         const dayLetter = d.toLocaleDateString('es-ES', { weekday: 'narrow' }).toUpperCase();
         const dayNum = String(d.getDate()).padStart(2, '0');
         const monthNum = String(d.getMonth() + 1).padStart(2, '0');
-        const isToday = i === 0;
+        const isToday = i === 29;
         const label = isToday ? `Hoy (${dayNum}/${monthNum})` : `${dayLetter} ${dayNum}/${monthNum}`;
         const dateStr = getLocalDateKey(d);
 
@@ -202,54 +202,57 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
   return (
     <div className="flex flex-col w-full px-4 gap-6 pt-2 pb-8">
-      {/* 1. KPIs de HOY: Ingresado, Gastado y Ganancia del día actual */}
+      {/* 1. KPIs del MES actual: Ingresado, Gastado y Ganancia del mes en curso */}
       <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between">
+        {/* Encabezado del mes: al tocarlo abre el calendario del mes */}
+        <button
+          type="button"
+          onClick={() => setIsCalendarioOpen(true)}
+          className="flex items-baseline justify-between cursor-pointer group text-left"
+        >
           <h2 className="text-sm font-headline font-bold text-on-surface flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-base">today</span>
-            Hoy
+            Este Mes · <span className="capitalize">{new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
           </h2>
-          <span className="text-[10px] text-on-surface-variant capitalize">
-            {new Date().toLocaleDateString('es-ES', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
+          <span className="text-[9px] font-bold text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-full group-hover:bg-primary group-hover:text-on-primary transition-all flex items-center gap-0.5">
+            <span className="material-symbols-outlined text-[11px]">calendar_month</span>
+            Calendario
+            <span className="material-symbols-outlined text-[11px]">chevron_right</span>
           </span>
-        </div>
+        </button>
 
-        {/* 3 KPI boxes del día (mismo patrón visual que GraficasView) */}
+        {/* 3 KPI boxes del mes (mismo patrón visual que GraficasView) */}
         <div className="grid grid-cols-3 gap-2">
-          {/* Ingresado de hoy */}
+          {/* Ingresado del mes */}
           <div className="bg-surface-container-high/60 border border-violet-500/30 rounded-xl p-2 flex flex-col">
             <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wider">
               Ingresado
             </span>
             <span className="text-sm sm:text-base font-headline font-bold text-on-surface truncate">
-              {formatMoney(todayIngresado, displayCurrency, exchangeRate)}
+              {formatMoney(monthIngresado, displayCurrency, exchangeRate)}
             </span>
             <span className="text-[9px] text-on-surface-variant mt-0.5">
-              {todaySales.length} ventas
+              {monthSales.length} ventas
             </span>
           </div>
 
-          {/* Gastado de hoy */}
+          {/* Gastado del mes */}
           <div className="bg-surface-container-high/60 border border-rose-500/30 rounded-xl p-2 flex flex-col">
             <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider">
               Gastado
             </span>
             <span className="text-sm sm:text-base font-headline font-bold text-rose-300 truncate">
-              {formatMoney(todayGastado, displayCurrency, exchangeRate)}
+              {formatMoney(monthGastado, displayCurrency, exchangeRate)}
             </span>
           </div>
 
-          {/* Ganancia de hoy */}
+          {/* Ganancia del mes */}
           <div className="bg-surface-container-high/60 border border-emerald-500/30 rounded-xl p-2 flex flex-col">
             <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
               Ganancia
             </span>
-            <span className={`text-sm sm:text-base font-headline font-bold truncate ${todayGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {formatMoney(todayGanancia, displayCurrency, exchangeRate)}
+            <span className={`text-sm sm:text-base font-headline font-bold truncate ${monthGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {formatMoney(monthGanancia, displayCurrency, exchangeRate)}
             </span>
           </div>
         </div>
@@ -543,7 +546,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
               </div>
             </div>
 
-            {/* Ganancia Total histórica (número ⇄ mini gráfica) */}
+            {/* Ganancia del Mes (número ⇄ mini gráfica) */}
             <div
               onClick={() => setShowProfitChart(!showProfitChart)}
               className="col-span-2 bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-2 relative overflow-hidden group shadow-sm cursor-pointer hover:border-primary/50 transition-all"
@@ -554,7 +557,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                     payments
                   </span>
                   <span className="text-xs font-medium uppercase tracking-wider">
-                    Ganancia Total (histórica)
+                    Ganancia del Mes
                   </span>
                 </div>
                 <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
@@ -568,18 +571,18 @@ export const InicioView: React.FC<InicioViewProps> = ({
               {!showProfitChart ? (
                 <div>
                   <div className="text-3xl font-headline font-bold text-on-surface z-10 flex items-baseline gap-1">
-                    {formatMoney(totalProfit, displayCurrency, exchangeRate)}
+                    {formatMoney(monthGanancia, displayCurrency, exchangeRate)}
                   </div>
 
                   {/* Mini text Ingresado y Gastado */}
                   <div className="flex items-center gap-3 text-[11px] font-bold mt-2 pt-1.5 border-t border-outline-variant/30 z-10">
                     <span className="text-violet-400 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
-                      Ingresado: {formatMoney(totalSalesRevenue, displayCurrency, exchangeRate)}
+                      Ingresado: {formatMoney(monthIngresado, displayCurrency, exchangeRate)}
                     </span>
                     <span className="text-rose-400 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                      Gastado: {formatMoney(confirmedSales.reduce((a, s) => a + s.costoUnidadesVendidasMXN, 0) + operatingExpenses.reduce((a, e) => a + e.montoMXN, 0), displayCurrency, exchangeRate)}
+                      Gastado: {formatMoney(monthGastado, displayCurrency, exchangeRate)}
                     </span>
                   </div>
 
@@ -659,7 +662,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                     </span>
                   </div>
                   <div className="text-xl font-headline font-bold text-on-surface z-10 mt-1">
-                    {totalSalesCount} <span className="text-xs font-normal text-on-surface-variant">ventas</span>
+                    {monthSales.length} <span className="text-xs font-normal text-on-surface-variant">ventas este mes</span>
                   </div>
                 </div>
                 <div className="mt-2 text-[10px] text-tertiary font-bold flex items-center gap-1">
