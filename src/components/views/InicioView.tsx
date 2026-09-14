@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   formatMoney,
@@ -53,6 +53,43 @@ export const InicioView: React.FC<InicioViewProps> = ({
     .reduce((acc, e) => acc + e.montoMXN, 0);
   const monthGastado = monthCostoMercancia + monthGastosOp;
   const monthGanancia = monthIngresado - monthGastado;
+
+  // KPIs del DIA actual (ventas y gastos confirmados de hoy)
+  const todayKey = getLocalDateKey(new Date());
+  const todaySales = confirmedSales.filter((s) => s.fecha && getLocalDateKey(s.fecha) === todayKey);
+  const todayExpenses = operatingExpenses.filter((e) => e.fecha && getLocalDateKey(e.fecha) === todayKey);
+  const dayIngresado = todaySales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
+  const dayCogs = todaySales.reduce((acc, s) => acc + s.costoUnidadesVendidasMXN, 0);
+  const dayOpExp = todayExpenses.reduce((acc, e) => acc + e.montoMXN, 0);
+  const dayGastado = dayCogs + dayOpExp;
+  const dayGanancia = dayIngresado - dayGastado;
+
+  // Modo de las cards KPI: 'mes' | 'dia'. El toque fija el último modo elegido.
+  const [kpiMode, setKpiMode] = useState<'mes' | 'dia'>('mes');
+  const lastTouchMs = useRef(Date.now());
+
+  const toggleKpiMode = () => {
+    lastTouchMs.current = Date.now();
+    setKpiMode((m) => (m === 'mes' ? 'dia' : 'mes'));
+  };
+
+  // Rota mes ⇄ día cada 7 s si el usuario no ha tocado en los últimos 10 s
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (Date.now() - lastTouchMs.current > 10000) {
+        setKpiMode((m) => (m === 'mes' ? 'dia' : 'mes'));
+      }
+    }, 7000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Modo resuelto: números y contador de ventas según la vista elegida
+  const kpiIsMonth = kpiMode === 'mes';
+  const kpiIngresado = kpiIsMonth ? monthIngresado : dayIngresado;
+  const kpiGastado = kpiIsMonth ? monthGastado : dayGastado;
+  const kpiGanancia = kpiIsMonth ? monthGanancia : dayGanancia;
+  const kpiSalesCount = kpiIsMonth ? monthSales.length : todaySales.length;
+  const kpiSalesLabel = kpiIsMonth ? 'ventas' : 'ventas hoy';
 
   // Total current inventory value
   const totalInventoryValueMXN = batches.reduce(
@@ -213,6 +250,16 @@ export const InicioView: React.FC<InicioViewProps> = ({
           <h2 className="text-sm font-headline font-bold text-on-surface flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-base">today</span>
             Este Mes · <span className="capitalize">{new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleKpiMode();
+              }}
+              className="ml-0.5 text-[10px] font-bold text-on-primary bg-primary rounded-full px-2 py-0.5 uppercase flex items-center gap-1 cursor-pointer select-none"
+            >
+              <span className="material-symbols-outlined text-[11px]">swap_horiz</span>
+              {kpiIsMonth ? 'MES' : 'DÍA'}
+            </span>
           </h2>
           <span className="text-[9px] font-bold text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-full group-hover:bg-primary group-hover:text-on-primary transition-all flex items-center gap-0.5">
             <span className="material-symbols-outlined text-[11px]">calendar_month</span>
@@ -221,41 +268,56 @@ export const InicioView: React.FC<InicioViewProps> = ({
           </span>
         </button>
 
-        {/* 3 KPI boxes del mes (mismo patrón visual que GraficasView) */}
-        <div className="grid grid-cols-3 gap-2">
-          {/* Ingresado del mes */}
+        {/* 3 KPI boxes del mes/día (al tocarlas alternan día ⇄ mes) */}
+        <div
+          onClick={toggleKpiMode}
+          className="grid grid-cols-3 gap-2 cursor-pointer select-none"
+        >
+          {/* Ingresado */}
           <div className="bg-surface-container-high/60 border border-violet-500/30 rounded-xl p-2 flex flex-col">
             <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wider">
               Ingresado
             </span>
-            <span className="text-sm sm:text-base font-headline font-bold text-on-surface truncate">
-              {formatMoney(monthIngresado, displayCurrency, exchangeRate)}
-            </span>
+            <AnimatedNumber
+              value={kpiIngresado}
+              format={(v) => formatMoney(v, displayCurrency, exchangeRate)}
+              className="text-sm sm:text-base font-headline font-bold text-on-surface truncate"
+            />
             <span className="text-[9px] text-on-surface-variant mt-0.5">
-              {monthSales.length} ventas
+              {kpiSalesCount} {kpiSalesLabel}
             </span>
           </div>
 
-          {/* Gastado del mes */}
+          {/* Gastado */}
           <div className="bg-surface-container-high/60 border border-rose-500/30 rounded-xl p-2 flex flex-col">
             <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider">
               Gastado
             </span>
-            <span className="text-sm sm:text-base font-headline font-bold text-rose-300 truncate">
-              {formatMoney(monthGastado, displayCurrency, exchangeRate)}
-            </span>
+            <AnimatedNumber
+              value={kpiGastado}
+              format={(v) => formatMoney(v, displayCurrency, exchangeRate)}
+              className="text-sm sm:text-base font-headline font-bold text-rose-300 truncate"
+            />
           </div>
 
-          {/* Ganancia del mes */}
+          {/* Ganancia */}
           <div className="bg-surface-container-high/60 border border-emerald-500/30 rounded-xl p-2 flex flex-col">
             <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
               Ganancia
             </span>
-            <span className={`text-sm sm:text-base font-headline font-bold truncate ${monthGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {formatMoney(monthGanancia, displayCurrency, exchangeRate)}
-            </span>
+            <AnimatedNumber
+              value={kpiGanancia}
+              format={(v) => formatMoney(v, displayCurrency, exchangeRate)}
+              className={`text-sm sm:text-base font-headline font-bold truncate ${kpiGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+            />
           </div>
         </div>
+
+        {/* Ayuda sutil: tocar las cards muestra el día */}
+        <p className="text-[9px] text-on-surface-variant flex items-center gap-1">
+          <span className="material-symbols-outlined text-[11px] text-tertiary">touch_app</span>
+          Toca las cards para ver el día
+        </p>
       </section>
 
       {/* 2. Acciones: Vender GIGANTE + Compra y Gasto secundarias */}
@@ -773,4 +835,41 @@ export const InicioView: React.FC<InicioViewProps> = ({
       />
     </div>
   );
+};
+
+// Anima el número hacia su objetivo con suavidad
+interface AnimatedNumberProps {
+  value: number;
+  format: (v: number) => string;
+  className?: string;
+}
+
+const AnimatedNumber: React.FC<AnimatedNumberProps> = ({ value, format, className }) => {
+  const [display, setDisplay] = useState(value);
+  const displayRef = useRef(value);
+
+  useEffect(() => {
+    const prev = displayRef.current;
+    if (prev === value) return;
+    const duration = 700;
+    let start: number | null = null;
+    let rafId: number;
+
+    const step = (ts: number) => {
+      if (start === null) start = ts;
+      const t = Math.min((ts - start) / duration, 1);
+      const e = t < 1 ? t * t * (3 - 2 * t) : 1;
+      const next = prev + (value - prev) * e;
+      displayRef.current = next;
+      setDisplay(next);
+      if (t < 1) {
+        rafId = requestAnimationFrame(step);
+      }
+    };
+
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, [value]);
+
+  return <span className={className}>{format(display)}</span>;
 };
