@@ -33,6 +33,45 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
 
   const confirmedSales = sales.filter((s) => s.estado === 'confirmada');
 
+  // Prefijo YYYY-MM del mes visible del calendario
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  // Ventas, gastos y lotes del mes visible
+  const monthSales = confirmedSales.filter((s) =>
+    getLocalDateKey(s.fecha).startsWith(monthPrefix)
+  );
+  const monthExpenses = operatingExpenses.filter((e) =>
+    getLocalDateKey(e.fecha).startsWith(monthPrefix)
+  );
+  const monthBatches = batches.filter((b) =>
+    getLocalDateKey(b.fecha).startsWith(monthPrefix)
+  );
+
+  // Totales monetarios del mes
+  const monthIngresado = monthSales.reduce(
+    (acc, s) => acc + s.ingresoTotalMXN,
+    0
+  );
+  const monthCogs = monthSales.reduce(
+    (acc, s) => acc + s.costoUnidadesVendidasMXN,
+    0
+  );
+  const monthOpExp = monthExpenses.reduce((acc, e) => acc + e.montoMXN, 0);
+  const monthGastado = monthCogs + monthOpExp;
+  const monthGanancia = monthIngresado - monthGastado;
+
+  // Métricas secundarias del mes
+  const monthCount = monthSales.length;
+  const monthUnits = monthSales.reduce((acc, s) => acc + s.cantidad, 0);
+  const avgTicket = monthCount ? monthIngresado / monthCount : 0;
+
+  // Días del mes con al menos un movimiento
+  const daysWithActivity = new Set([
+    ...monthSales.map((s) => getLocalDateKey(s.fecha)),
+    ...monthExpenses.map((e) => getLocalDateKey(e.fecha)),
+    ...monthBatches.map((b) => getLocalDateKey(b.fecha)),
+  ]).size;
+
   // Compute stats for a specific YYYY-MM-DD
   const getDayStats = (dateKey: string) => {
     const daySales = confirmedSales.filter(
@@ -334,6 +373,78 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                   ))
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Resumen del mes visible */}
+          {!selectedDayKey && (
+            <div className="mt-4 p-3 bg-surface-container rounded-xl border border-primary/30 flex flex-col gap-2 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-outline-variant/30 pb-2">
+                <span className="text-xs font-bold text-primary flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">summarize</span>
+                  Resumen de {monthName.charAt(0).toUpperCase() + monthName.slice(1)}
+                </span>
+              </div>
+
+              {/* KPIs principales del mes */}
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg p-1.5">
+                  <div className="text-[9px] text-violet-400 font-bold uppercase">Ingresado</div>
+                  <div className="font-bold text-on-surface">
+                    {formatMoney(monthIngresado, displayCurrency, exchangeRate)}
+                  </div>
+                </div>
+                <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-1.5">
+                  <div className="text-[9px] text-rose-400 font-bold uppercase">Gastado</div>
+                  <div className="font-bold text-rose-300">
+                    {formatMoney(monthGastado, displayCurrency, exchangeRate)}
+                  </div>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5">
+                  <div className="text-[9px] text-emerald-400 font-bold uppercase">Ganancia Libre</div>
+                  <div className={`font-bold ${monthGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {formatMoney(monthGanancia, displayCurrency, exchangeRate)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Mini-celdas con métricas del mes */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
+                  <div className="text-[9px] text-on-surface-variant font-bold uppercase">Ventas</div>
+                  <div className="font-bold text-on-surface">{monthCount}</div>
+                </div>
+                <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
+                  <div className="text-[9px] text-on-surface-variant font-bold uppercase">Artículos vendidos</div>
+                  <div className="font-bold text-on-surface">{monthUnits} u.</div>
+                </div>
+                <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
+                  <div className="text-[9px] text-on-surface-variant font-bold uppercase">Ticket promedio</div>
+                  <div className="font-bold text-on-surface">
+                    {formatMoney(avgTicket, displayCurrency, exchangeRate)}
+                  </div>
+                </div>
+                <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
+                  <div className="text-[9px] text-on-surface-variant font-bold uppercase">Gastos operativos</div>
+                  <div className="font-bold text-rose-300">
+                    {monthExpenses.length > 0
+                      ? `${monthExpenses.length} −${formatMoney(monthOpExp, displayCurrency, exchangeRate, false)}`
+                      : '0'}
+                  </div>
+                </div>
+                <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
+                  <div className="text-[9px] text-on-surface-variant font-bold uppercase">Lotes comprados</div>
+                  <div className="font-bold text-on-surface">{monthBatches.length}</div>
+                </div>
+                <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
+                  <div className="text-[9px] text-on-surface-variant font-bold uppercase">Días con movimiento</div>
+                  <div className="font-bold text-on-surface">{daysWithActivity}</div>
+                </div>
+              </div>
+
+              <p className="text-[9px] text-on-surface-variant italic text-center">
+                Toca un día para ver su detalle
+              </p>
             </div>
           )}
         </div>
