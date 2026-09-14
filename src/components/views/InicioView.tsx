@@ -16,6 +16,13 @@ interface InicioViewProps {
   onSelectProduct: (productId: string) => void;
 }
 
+// Periodo visible en las cards KPI: mes, semana o día
+type KpiMode = 'mes' | 'semana' | 'dia';
+
+// Cicla el periodo: mes → semana → día → mes
+const nextKpiMode = (m: KpiMode): KpiMode =>
+  m === 'mes' ? 'semana' : m === 'semana' ? 'dia' : 'mes';
+
 export const InicioView: React.FC<InicioViewProps> = ({
   onNavigateTab,
   onOpenCompra,
@@ -44,6 +51,13 @@ export const InicioView: React.FC<InicioViewProps> = ({
   const isThisMonth = (fecha?: string | Date) =>
     !!fecha && getLocalDateKey(fecha).startsWith(currentMonthKey);
 
+  // ¿La fecha está en los últimos 7 días (hoy inclusive)?
+  const isThisWeek = (fecha: string | Date): boolean => {
+    const d = new Date(fecha);
+    const diff = (Date.now() - d.getTime()) / 86400000;
+    return diff >= 0 && diff < 7;
+  };
+
   // KPIs del MES actual (ventas y gastos del mes en curso)
   const monthSales = confirmedSales.filter((s) => s.fecha && isThisMonth(s.fecha));
   const monthIngresado = monthSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
@@ -64,32 +78,46 @@ export const InicioView: React.FC<InicioViewProps> = ({
   const dayGastado = dayCogs + dayOpExp;
   const dayGanancia = dayIngresado - dayGastado;
 
-  // Modo de las cards KPI: 'mes' | 'dia'. El toque fija el último modo elegido.
-  const [kpiMode, setKpiMode] = useState<'mes' | 'dia'>('mes');
+  // KPIs de la SEMANA actual (últimos 7 días, hoy inclusive)
+  const weekSales = confirmedSales.filter((s) => s.fecha && isThisWeek(s.fecha));
+  const weekExpenses = operatingExpenses.filter((e) => e.fecha && isThisWeek(e.fecha));
+  const weekIngresado = weekSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
+  const weekCogs = weekSales.reduce((acc, s) => acc + s.costoUnidadesVendidasMXN, 0);
+  const weekOpExp = weekExpenses.reduce((acc, e) => acc + e.montoMXN, 0);
+  const weekGastado = weekCogs + weekOpExp;
+  const weekGanancia = weekIngresado - weekGastado;
+  const weekSalesCount = weekSales.length;
+
+  // Modo de las cards KPI: 'mes' | 'semana' | 'dia'. El toque fija el último modo elegido.
+  const [kpiMode, setKpiMode] = useState<KpiMode>('mes');
   const lastTouchMs = useRef(Date.now());
 
   const toggleKpiMode = () => {
     lastTouchMs.current = Date.now();
-    setKpiMode((m) => (m === 'mes' ? 'dia' : 'mes'));
+    setKpiMode((m) => nextKpiMode(m));
   };
 
-  // Rota mes ⇄ día cada 7 s si el usuario no ha tocado en los últimos 10 s
+  // Rota mes → semana → día cada 7 s si el usuario no ha tocado en los últimos 10 s
   useEffect(() => {
     const id = setInterval(() => {
       if (Date.now() - lastTouchMs.current > 10000) {
-        setKpiMode((m) => (m === 'mes' ? 'dia' : 'mes'));
+        setKpiMode((m) => nextKpiMode(m));
       }
     }, 7000);
     return () => clearInterval(id);
   }, []);
 
   // Modo resuelto: números y contador de ventas según la vista elegida
-  const kpiIsMonth = kpiMode === 'mes';
-  const kpiIngresado = kpiIsMonth ? monthIngresado : dayIngresado;
-  const kpiGastado = kpiIsMonth ? monthGastado : dayGastado;
-  const kpiGanancia = kpiIsMonth ? monthGanancia : dayGanancia;
-  const kpiSalesCount = kpiIsMonth ? monthSales.length : todaySales.length;
-  const kpiSalesLabel = kpiIsMonth ? 'ventas' : 'ventas hoy';
+  const kpiIngresado =
+    kpiMode === 'mes' ? monthIngresado : kpiMode === 'semana' ? weekIngresado : dayIngresado;
+  const kpiGastado =
+    kpiMode === 'mes' ? monthGastado : kpiMode === 'semana' ? weekGastado : dayGastado;
+  const kpiGanancia =
+    kpiMode === 'mes' ? monthGanancia : kpiMode === 'semana' ? weekGanancia : dayGanancia;
+  const kpiSalesCount =
+    kpiMode === 'mes' ? monthSales.length : kpiMode === 'semana' ? weekSalesCount : todaySales.length;
+  const kpiSalesLabel =
+    kpiMode === 'mes' ? 'ventas' : kpiMode === 'semana' ? 'ventas esta semana' : 'ventas hoy';
 
   // Total current inventory value
   const totalInventoryValueMXN = batches.reduce(
@@ -241,34 +269,54 @@ export const InicioView: React.FC<InicioViewProps> = ({
     <div className="flex flex-col w-full px-4 gap-6 pt-2 pb-8">
       {/* 1. KPIs del MES actual: Ingresado, Gastado y Ganancia del mes en curso */}
       <section className="flex flex-col gap-3">
-        {/* Encabezado del mes: al tocarlo abre el calendario del mes */}
-        <button
-          type="button"
-          onClick={() => setIsCalendarioOpen(true)}
-          className="flex items-baseline justify-between cursor-pointer group text-left"
-        >
-          <h2 className="text-sm font-headline font-bold text-on-surface flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-base">today</span>
-            Este Mes · <span className="capitalize">{new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleKpiMode();
+        {/* Encabezado KPIs: selector de periodo (MES/SEM/DÍA) + chip de calendario */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Segmented control: cambia el periodo visible de las cards KPI */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                lastTouchMs.current = Date.now();
+                setKpiMode('mes');
               }}
-              className="ml-0.5 text-[10px] font-bold text-on-primary bg-primary rounded-full px-2 py-0.5 uppercase flex items-center gap-1 cursor-pointer select-none"
+              className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full transition-colors ${kpiMode === 'mes' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface border border-outline-variant'}`}
             >
-              <span className="material-symbols-outlined text-[11px]">swap_horiz</span>
-              {kpiIsMonth ? 'MES' : 'DÍA'}
-            </span>
-          </h2>
-          <span className="text-[9px] font-bold text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-full group-hover:bg-primary group-hover:text-on-primary transition-all flex items-center gap-0.5">
+              MES
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                lastTouchMs.current = Date.now();
+                setKpiMode('semana');
+              }}
+              className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full transition-colors ${kpiMode === 'semana' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface border border-outline-variant'}`}
+            >
+              SEM
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                lastTouchMs.current = Date.now();
+                setKpiMode('dia');
+              }}
+              className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full transition-colors ${kpiMode === 'dia' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface border border-outline-variant'}`}
+            >
+              DÍA
+            </button>
+          </div>
+
+          {/* Chip Calendario: abre el calendario del mes */}
+          <button
+            type="button"
+            onClick={() => setIsCalendarioOpen(true)}
+            className="text-[9px] font-bold text-primary bg-primary/10 border border-primary/30 px-2 py-1 rounded-full transition-colors hover:bg-primary hover:text-on-primary flex items-center gap-0.5 flex-shrink-0"
+          >
             <span className="material-symbols-outlined text-[11px]">calendar_month</span>
             Calendario
-            <span className="material-symbols-outlined text-[11px]">chevron_right</span>
-          </span>
-        </button>
+          </button>
+        </div>
 
-        {/* 3 KPI boxes del mes/día (al tocarlas alternan día ⇄ mes) */}
+        {/* 3 KPI boxes (al tocarlas ciclan mes → semana → día) */}
         <div
           onClick={toggleKpiMode}
           className="grid grid-cols-3 gap-2 cursor-pointer select-none"
@@ -313,10 +361,10 @@ export const InicioView: React.FC<InicioViewProps> = ({
           </div>
         </div>
 
-        {/* Ayuda sutil: tocar las cards muestra el día */}
+        {/* Ayuda sutil: tocar las cards cambia la vista */}
         <p className="text-[9px] text-on-surface-variant flex items-center gap-1">
           <span className="material-symbols-outlined text-[11px] text-tertiary">touch_app</span>
-          Toca las cards para ver el día
+          Toca las cards para cambiar la vista
         </p>
       </section>
 
