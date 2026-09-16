@@ -3,14 +3,22 @@ import { useApp } from '../../context/AppContext';
 import {
   formatMoney,
   getProductTotalStock,
-  getProductBadges,
   getLocalDateKey,
 } from '../../utils/calculations';
 import { ChartRenderer, ChartDataPoint } from '../ChartRenderer';
 import { CalendarioMesModal } from '../modals/CalendarioMesModal';
+// Componentes compartidos de mostrador (también usados por Reportes/Gráficas)
+import { Rankings } from '../graficas/Rankings';
+import { MargenPromedio } from '../graficas/MargenPromedio';
+import { GastosCategoria } from '../graficas/GastosCategoria';
 
 interface InicioViewProps {
-  onNavigateTab: (tab: 'vender' | 'inventario' | 'graficas' | 'mas') => void;
+  // Solo pestañas reales: inventario o más
+  onNavigateTab: (tab: 'inventario' | 'mas') => void;
+  // Abre el modal de venta global
+  onOpenVenta: () => void;
+  // Abre el historial de ventas (modal global)
+  onOpenHistorialVentas: () => void;
   onOpenCompra: () => void;
   onOpenGasto: () => void;
   onSelectProduct: (productId: string) => void;
@@ -25,6 +33,8 @@ const nextKpiMode = (m: KpiMode): KpiMode =>
 
 export const InicioView: React.FC<InicioViewProps> = ({
   onNavigateTab,
+  onOpenVenta,
+  onOpenHistorialVentas,
   onOpenCompra,
   onOpenGasto,
   onSelectProduct,
@@ -247,23 +257,51 @@ export const InicioView: React.FC<InicioViewProps> = ({
     return stock > 0 && stock <= p.stockMinimo;
   });
 
-  // Top Sellers (histórico por unidades)
-  const productSalesMap = new Map<string, number>();
+  // Métricas de ventas por producto (histórico) para Rankings compartido
+  const productStatsMap = new Map<string, { qty: number; revenue: number; profit: number }>();
   confirmedSales.forEach((s) => {
-    productSalesMap.set(
-      s.productoId,
-      (productSalesMap.get(s.productoId) || 0) + s.cantidad
-    );
+    const existing = productStatsMap.get(s.productoId) || { qty: 0, revenue: 0, profit: 0 };
+    productStatsMap.set(s.productoId, {
+      qty: existing.qty + s.cantidad,
+      revenue: existing.revenue + s.ingresoTotalMXN,
+      profit: existing.profit + s.gananciaVentaMXN,
+    });
   });
 
-  const topSellingProducts = [...products]
-    .map((p) => ({
-      product: p,
-      qtySold: productSalesMap.get(p.id) || 0,
-    }))
-    .filter((item) => item.qtySold > 0)
-    .sort((a, b) => b.qtySold - a.qtySold)
-    .slice(0, 2);
+  // Ranking compartido: top 5 Más Vendidos (por unidades) y Más Rentables (por ganancia)
+  const masVendidos = [...products]
+    .map((p) => ({ product: p, ...(productStatsMap.get(p.id) || { qty: 0, revenue: 0, profit: 0 }) }))
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 5);
+
+  const masRentables = [...products]
+    .map((p) => ({ product: p, ...(productStatsMap.get(p.id) || { qty: 0, revenue: 0, profit: 0 }) }))
+    .sort((a, b) => b.profit - a.profit)
+    .slice(0, 5);
+
+  // Margen promedio % sobre ventas confirmadas (misma fórmula que Reportes/Gráficas)
+  const rankingRevenueMXN = confirmedSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
+  const rankingProfitMXN = confirmedSales.reduce((acc, s) => acc + s.gananciaVentaMXN, 0);
+  const averageMarginPct =
+    rankingRevenueMXN > 0 ? (rankingProfitMXN / rankingRevenueMXN) * 100 : 0;
+
+  // Gastos operativos del MES actual agrupados por categoría
+  const monthOpExpenses = operatingExpenses.filter((e) => e.fecha && isThisMonth(e.fecha));
+  const totalOpExpensesMXN = monthOpExpenses.reduce((acc, e) => acc + e.montoMXN, 0);
+  const expenseCatMap = new Map<string, number>();
+  monthOpExpenses.forEach((e) => {
+    expenseCatMap.set(e.categoria, (expenseCatMap.get(e.categoria) || 0) + e.montoMXN);
+  });
+
+  const expenseCategoryList = [
+    { cat: 'renta', name: 'Renta', icon: 'storefront', amount: expenseCatMap.get('renta') || 0 },
+    { cat: 'servicios', name: 'Servicios', icon: 'bolt', amount: expenseCatMap.get('servicios') || 0 },
+    { cat: 'nomina', name: 'Nómina', icon: 'groups', amount: expenseCatMap.get('nomina') || 0 },
+    { cat: 'marketing', name: 'Marketing', icon: 'campaign', amount: expenseCatMap.get('marketing') || 0 },
+    { cat: 'insumos', name: 'Insumos', icon: 'inventory', amount: expenseCatMap.get('insumos') || 0 },
+    { cat: 'mantenimiento', name: 'Mantenimiento', icon: 'build', amount: expenseCatMap.get('mantenimiento') || 0 },
+    { cat: 'otros', name: 'Otros', icon: 'more_horiz', amount: expenseCatMap.get('otros') || 0 },
+  ].filter((item) => item.amount > 0);
 
   return (
     <div className="flex flex-col w-full px-4 gap-6 pt-2 pb-8">
@@ -370,9 +408,9 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
       {/* 2. Acciones: Vender GIGANTE + Compra y Gasto secundarias */}
       <section className="flex flex-col gap-2">
-        {/* Botón Vender destacado a todo el ancho */}
+        {/* Botón Vender destacado a todo el ancho: abre el modal de venta global */}
         <button
-          onClick={() => onNavigateTab('vender')}
+          onClick={() => onOpenVenta()}
           className="w-full bg-primary hover:bg-primary/90 text-on-primary rounded-2xl py-6 px-4 flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-primary/30 col-span-3"
         >
           <span
@@ -541,66 +579,13 @@ export const InicioView: React.FC<InicioViewProps> = ({
         )}
       </section>
 
-      {/* 4. Top Ventas */}
+      {/* 4. Rankings compartidos: Más Vendidos vs Más Rentables (top 5) */}
       <section className="flex flex-col gap-3">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
-            <span
-              className="material-symbols-outlined text-[16px] text-amber-500"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              local_fire_department
-            </span>
-            Top Ventas
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          {topSellingProducts.length === 0 ? (
-            <div className="col-span-2 bg-surface-container border border-outline-variant rounded-lg p-4 text-center text-xs text-on-surface-variant">
-              Aún no se han registrado ventas en el sistema.
-            </div>
-          ) : (
-            topSellingProducts.map((item, index) => {
-              const badges = getProductBadges(item.product, batches, sales);
-              return (
-                <div
-                  key={item.product.id}
-                  onClick={() => onSelectProduct(item.product.id)}
-                  className="bg-surface-container rounded-lg border border-outline-variant p-2 flex flex-col gap-2 relative overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
-                >
-                  <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-1.5 py-0.5 rounded text-[10px] font-bold text-on-surface flex items-center gap-1 border border-outline-variant z-10">
-                    #{index + 1}
-                  </div>
-                  <div className="w-full aspect-square rounded-md overflow-hidden bg-surface-container-lowest relative border border-outline-variant flex items-center justify-center">
-                    {item.product.imagen ? (
-                      <img
-                        src={item.product.imagen}
-                        alt={item.product.nombre}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-on-surface-variant text-2xl">
-                        inventory_2
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1">
-                      <h3 className="text-xs font-bold text-on-surface truncate flex-1">
-                        {item.product.nombre}
-                      </h3>
-                      <span className="text-[10px]">{badges.join(' ')}</span>
-                    </div>
-                    <span className="text-[10px] text-tertiary font-bold mt-0.5">
-                      {item.qtySold} vendidos
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <Rankings
+          masVendidos={masVendidos}
+          masRentables={masRentables}
+          formatMoney={(v) => formatMoney(v, displayCurrency, exchangeRate)}
+        />
       </section>
 
       {/* 5. "Ver más": consultas de baja frecuencia en acordeón */}
@@ -754,9 +739,9 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
             {/* Ventas Registradas + Valor Inventario en par */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Ventas Registradas (Opens Sales History on Vender tab) */}
+              {/* Ventas Registradas: abre el historial de ventas (modal global) */}
               <div
-                onClick={() => onNavigateTab('vender')}
+                onClick={onOpenHistorialVentas}
                 className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-tertiary/50 transition-all shadow-sm"
               >
                 <div>
@@ -872,6 +857,16 @@ export const InicioView: React.FC<InicioViewProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Margen Promedio % (mostrador compacto) */}
+            <MargenPromedio promedioPorcentaje={averageMarginPct} />
+
+            {/* Gastos operativos del mes por categoría (mostrador compacto) */}
+            <GastosCategoria
+              categorias={expenseCategoryList}
+              totalGastos={totalOpExpensesMXN}
+              formatMoney={(v) => formatMoney(v, displayCurrency, exchangeRate)}
+            />
           </div>
         )}
       </section>

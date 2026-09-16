@@ -13,6 +13,7 @@ interface DetalleProductoModalProps {
   onClose: () => void;
   onOpenEditProduct: (productId: string) => void;
   onOpenNewBatchForProduct: (productId: string) => void;
+  onOpenSaleForProduct?: (productId: string) => void;
 }
 
 export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
@@ -20,6 +21,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
   onClose,
   onOpenEditProduct,
   onOpenNewBatchForProduct,
+  onOpenSaleForProduct,
 }) => {
   const {
     settings,
@@ -159,6 +161,20 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Acción principal: vender este producto */}
+          {onOpenSaleForProduct && (
+            <button
+              type="button"
+              onClick={() => onOpenSaleForProduct?.(product.id)}
+              className="w-full py-3 bg-primary text-on-primary font-headline font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md hover:bg-primary/90 active:scale-[0.99] transition-all"
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                point_of_sale
+              </span>
+              Vender este producto
+            </button>
+          )}
 
           {/* Key Financial Specs Grid */}
           <div className="grid grid-cols-2 gap-3">

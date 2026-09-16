@@ -12,13 +12,15 @@ import {
 interface InventarioViewProps {
   onSelectProduct: (productId: string) => void;
   onOpenNuevoProducto: () => void;
-  onOpenCompra: () => void;
+  onOpenCompra: (productId?: string) => void;
+  onOpenVenta?: (productId?: string) => void;
 }
 
 export const InventarioView: React.FC<InventarioViewProps> = ({
   onSelectProduct,
   onOpenNuevoProducto,
   onOpenCompra,
+  onOpenVenta,
 }) => {
   const {
     settings,
@@ -292,18 +294,34 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   exchangeRate
                                 )}
                               </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenCompra();
-                                }}
-                                title="Comprar stock"
-                                className="text-on-surface-variant hover:text-primary"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">
-                                  add_shopping_cart
-                                </span>
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenVenta?.(p.id);
+                                  }}
+                                  title="Vender este producto"
+                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">
+                                    point_of_sale
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenCompra(p.id);
+                                  }}
+                                  title="Añadir stock"
+                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">
+                                    add_shopping_cart
+                                  </span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -375,6 +393,34 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   exchangeRate
                                 )}
                               </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenVenta?.(p.id);
+                                  }}
+                                  title="Vender este producto"
+                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">
+                                    point_of_sale
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenCompra(p.id);
+                                  }}
+                                  title="Añadir stock"
+                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">
+                                    add_shopping_cart
+                                  </span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -404,8 +450,17 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                 <span className="material-symbols-outlined text-[14px]">file_upload</span>
                 Importar Excel
               </button>
+              {onOpenVenta && (
+                <button
+                  onClick={() => onOpenVenta()}
+                  className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]">point_of_sale</span>
+                  + Vender
+                </button>
+              )}
               <button
-                onClick={onOpenCompra}
+                onClick={() => onOpenCompra()}
                 className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
               >
                 + Nueva Compra
@@ -669,7 +724,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               Productos Agotados ({agotados.length})
             </h2>
             <button
-              onClick={onOpenCompra}
+              onClick={() => onOpenCompra()}
               className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
             >
               + Reponer Stock
@@ -742,7 +797,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onOpenCompra();
+                          onOpenCompra(p.id);
                         }}
                         className="text-[11px] text-primary font-bold hover:underline"
                       >

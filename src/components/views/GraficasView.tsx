@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatMoney, getProductTotalStock, getLocalDateKey } from '../../utils/calculations';
 import { ChartRenderer, ChartDataPoint } from '../ChartRenderer';
+import { MargenPromedio } from '../graficas/MargenPromedio';
+import { GastosCategoria } from '../graficas/GastosCategoria';
+import { Rankings } from '../graficas/Rankings';
 
 export const GraficasView: React.FC = () => {
   const { settings, sales, operatingExpenses, adjustments, batches, products } = useApp();
@@ -11,7 +14,6 @@ export const GraficasView: React.FC = () => {
     const saved = localStorage.getItem('margen_graficas_period');
     return saved === 'dia' || saved === 'sem' || saved === 'mes' ? saved : 'dia';
   });
-  const [activeTopTab, setActiveTab] = useState<'vendidos' | 'rentables'>('vendidos');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const handlePeriodChange = (p: 'dia' | 'sem' | 'mes') => {
@@ -341,25 +343,9 @@ export const GraficasView: React.FC = () => {
         </div>
       </div>
 
-      {/* Two Columns: Margen Promedio & Capital Invertido */}
+      {/* Margen Promedio & Capital Invertido */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between">
-          <span className="text-xs text-on-surface-variant font-bold">
-            Margen Prom. Ventas
-          </span>
-          <div className="flex items-baseline gap-1 mt-1">
-            <span className="text-2xl font-headline font-bold text-on-surface">
-              {averageMarginPct.toFixed(0)}
-            </span>
-            <span className="text-xs font-bold text-on-surface-variant">%</span>
-          </div>
-          <div className="mt-2 w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-tertiary h-full rounded-full"
-              style={{ width: `${Math.min(100, averageMarginPct)}%` }}
-            ></div>
-          </div>
-        </div>
+        <MargenPromedio promedioPorcentaje={averageMarginPct} />
 
         <div className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between">
           <span className="text-xs text-on-surface-variant font-bold">
@@ -465,155 +451,18 @@ export const GraficasView: React.FC = () => {
       </div>
 
       {/* Gastos por Categoría */}
-      <div className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col gap-3">
-        <h2 className="text-sm font-headline font-bold text-on-surface">
-          Gastos Operativos por Categoría
-        </h2>
-
-        {expenseCategoryList.length === 0 ? (
-          <p className="text-xs text-on-surface-variant text-center py-4">
-            No se han registrado gastos operativos en este periodo.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {expenseCategoryList.map((item) => {
-              const pct =
-                totalOpExpensesMXN > 0
-                  ? Math.round((item.amount / totalOpExpensesMXN) * 100)
-                  : 0;
-
-              return (
-                <div key={item.cat} className="flex flex-col gap-1">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-on-surface flex items-center gap-1.5 capitalize">
-                      <span className="material-symbols-outlined text-[14px] text-primary">
-                        {item.icon}
-                      </span>{' '}
-                      {item.name}
-                    </span>
-                    <span className="text-on-surface-variant font-bold">
-                      {formatMoney(item.amount, displayCurrency, exchangeRate)}{' '}
-                      ({pct}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-primary h-full rounded-full"
-                      style={{ width: `${pct}%` }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <GastosCategoria
+        categorias={expenseCategoryList}
+        totalGastos={totalOpExpensesMXN}
+        formatMoney={(v) => formatMoney(v, displayCurrency, exchangeRate)}
+      />
 
       {/* Rankings: Más Vendidos vs Más Rentables */}
-      <div className="bg-surface-container rounded-xl border border-outline-variant overflow-hidden flex flex-col">
-        {/* Tabs */}
-        <div className="flex border-b border-outline-variant/30">
-          <button
-            onClick={() => setActiveTab('vendidos')}
-            className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors ${
-              activeTopTab === 'vendidos'
-                ? 'text-primary border-primary bg-surface-container-high'
-                : 'text-on-surface-variant border-transparent'
-            }`}
-          >
-            🔥 Más Vendidos
-          </button>
-          <button
-            onClick={() => setActiveTab('rentables')}
-            className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors ${
-              activeTopTab === 'rentables'
-                ? 'text-primary border-primary bg-surface-container-high'
-                : 'text-on-surface-variant border-transparent'
-            }`}
-          >
-            💰 Más Rentables
-          </button>
-        </div>
-
-        {/* List */}
-        <div className="flex flex-col divide-y divide-outline-variant/20 p-2">
-          {activeTopTab === 'vendidos' ? (
-            topSellingProducts.length === 0 ? (
-              <p className="text-xs text-on-surface-variant text-center py-4">
-                Sin ventas para clasificar.
-              </p>
-            ) : (
-              topSellingProducts.map((item, idx) => (
-                <div key={item.product.id} className="flex items-center gap-3 p-2">
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-lowest flex items-center justify-center text-on-surface-variant text-xs font-bold border border-outline-variant">
-                    {idx + 1}
-                  </div>
-                  <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant">
-                    {item.product.imagen ? (
-                      <img
-                        src={item.product.imagen}
-                        alt={item.product.nombre}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-on-surface-variant">
-                        inventory_2
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-xs font-bold text-on-surface truncate">
-                      {item.product.nombre}
-                    </span>
-                    <span className="text-[10px] text-on-surface-variant">
-                      {item.qty} uds. vendidas
-                    </span>
-                  </div>
-                  <span className="text-xs font-bold text-primary">
-                    {formatMoney(item.revenue, displayCurrency, exchangeRate)}
-                  </span>
-                </div>
-              ))
-            )
-          ) : topProfitableProducts.length === 0 ? (
-            <p className="text-xs text-on-surface-variant text-center py-4">
-              Sin ventas para clasificar.
-            </p>
-          ) : (
-            topProfitableProducts.map((item, idx) => (
-              <div key={item.product.id} className="flex items-center gap-3 p-2">
-                <div className="w-8 h-8 rounded-lg bg-surface-container-lowest flex items-center justify-center text-on-surface-variant text-xs font-bold border border-outline-variant">
-                  {idx + 1}
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant">
-                  {item.product.imagen ? (
-                    <img
-                      src={item.product.imagen}
-                      alt={item.product.nombre}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="material-symbols-outlined text-on-surface-variant">
-                      inventory_2
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col flex-1 min-w-0">
-                  <span className="text-xs font-bold text-on-surface truncate">
-                    {item.product.nombre}
-                  </span>
-                  <span className="text-[10px] text-tertiary font-bold">
-                    Ganancia: {formatMoney(item.profit, displayCurrency, exchangeRate)}
-                  </span>
-                </div>
-                <span className="text-xs font-bold text-tertiary">
-                  +{formatMoney(item.profit, displayCurrency, exchangeRate)}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <Rankings
+        masVendidos={topSellingProducts}
+        masRentables={topProfitableProducts}
+        formatMoney={(v) => formatMoney(v, displayCurrency, exchangeRate)}
+      />
     </div>
   );
 };

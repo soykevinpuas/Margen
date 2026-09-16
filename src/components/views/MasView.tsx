@@ -4,6 +4,7 @@ import { ExportExcelModal } from '../modals/ExportExcelModal';
 import { GastoHistoricoModal } from '../modals/GastoHistoricoModal';
 import { GananciasHistoricasModal } from '../modals/GananciasHistoricasModal';
 import { CompartirAmigoModal } from '../modals/CompartirAmigoModal';
+import { GraficasView } from './GraficasView';
 
 interface MasViewProps {
   onOpenCompra: () => void;
@@ -35,6 +36,7 @@ export const MasView: React.FC<MasViewProps> = ({
   const [isGastoHistoricoOpen, setIsGastoHistoricoOpen] = useState(false);
   const [isGananciasHistoricasOpen, setIsGananciasHistoricasOpen] = useState(false);
   const [isCompartirOpen, setIsCompartirOpen] = useState(false);
+  const [isReportesOpen, setIsReportesOpen] = useState(false);
 
   return (
     <div className="flex flex-col w-full p-4 gap-6 pb-24">
@@ -127,6 +129,28 @@ export const MasView: React.FC<MasViewProps> = ({
         </span>
 
         <div className="bg-surface-container border border-outline-variant rounded-xl overflow-hidden divide-y divide-outline-variant/30 shadow-sm">
+          <button
+            onClick={() => setIsReportesOpen(true)}
+            className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left bg-violet-500/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+                <span className="material-symbols-outlined text-lg">monitoring</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-on-surface">
+                  Reportes y Gráficas
+                </span>
+                <span className="text-[10px] text-on-surface-variant">
+                  Resumen general, estructura de costos y análisis del negocio
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-on-surface-variant text-lg">
+              chevron_right
+            </span>
+          </button>
+
           <button
             onClick={onOpenHistorialVentas}
             className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left"
@@ -345,6 +369,39 @@ export const MasView: React.FC<MasViewProps> = ({
         onClose={() => setIsCompartirOpen(false)}
         onOpenLanding={onOpenLanding}
       />
+
+      {/* Sub-pantalla full de Reportes: monta GraficasView completa */}
+      {isReportesOpen && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col animate-fade-in">
+          {/* Header */}
+          <div className="px-4 py-3.5 border-b border-outline-variant flex items-center justify-between bg-surface-container">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-violet-400 shadow-sm">
+                <span className="material-symbols-outlined text-xl">monitoring</span>
+              </div>
+              <div>
+                <h2 className="text-sm font-headline font-bold text-on-surface">
+                  Reportes
+                </h2>
+                <p className="text-[10px] text-on-surface-variant">
+                  Reportes completos y gráficas del negocio
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsReportesOpen(false)}
+              className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-on-surface"
+            >
+              <span className="material-symbols-outlined text-base">close</span>
+            </button>
+          </div>
+
+          {/* Contenido con scroll propio */}
+          <div className="flex-1 overflow-y-auto">
+            <GraficasView />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
