@@ -441,7 +441,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
           <div className="flex gap-1.5 mb-1">
             <button
               onClick={() => setIsImportOpen(true)}
-              className="flex-1 px-2 py-1.5 bg-surface-container-highest border border-outline-variant text-on-surface font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-surface-variant transition-colors"
+              className="flex-1 min-w-0 px-2 py-1.5 bg-surface-container-highest border border-outline-variant text-on-surface font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 text-center hover:bg-surface-variant transition-colors"
             >
               <span className="material-symbols-outlined text-[14px]">file_upload</span>
               Importar Excel
@@ -449,7 +449,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
             {onOpenVenta && (
               <button
                 onClick={() => onOpenVenta()}
-                className="flex-1 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap"
+                className="flex-1 min-w-0 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 text-center"
               >
                 <span className="material-symbols-outlined text-[14px]">point_of_sale</span>
                 + Vender
@@ -457,7 +457,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
             )}
             <button
               onClick={() => onOpenCompra()}
-              className="flex-1 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap"
+              className="flex-1 min-w-0 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 text-center"
             >
               <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
               + Nueva Compra
