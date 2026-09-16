@@ -437,35 +437,31 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
       {/* TAB 2: HISTORIAL DE COMPRAS (LOTES) */}
       {activeTab === 'compras' && (
         <div className="px-4 py-4 flex flex-col gap-3 text-xs">
-          <div className="flex justify-between items-center mb-1">
-            <h2 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">history_edu</span>
-              Lotes de Mercancía Comprada
-            </h2>
-            <div className="flex gap-2">
+          {/* Botones de acción simétricos (sin título de sección) */}
+          <div className="flex gap-1.5 mb-1">
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="flex-1 px-2 py-1.5 bg-surface-container-highest border border-outline-variant text-on-surface font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-surface-variant transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px]">file_upload</span>
+              Importar Excel
+            </button>
+            {onOpenVenta && (
               <button
-                onClick={() => setIsImportOpen(true)}
-                className="px-3 py-1.5 bg-surface-container-highest border border-outline-variant text-on-surface font-bold text-xs rounded-lg flex items-center gap-1 hover:bg-surface-variant transition-colors"
+                onClick={() => onOpenVenta()}
+                className="flex-1 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap"
               >
-                <span className="material-symbols-outlined text-[14px]">file_upload</span>
-                Importar Excel
+                <span className="material-symbols-outlined text-[14px]">point_of_sale</span>
+                + Vender
               </button>
-              {onOpenVenta && (
-                <button
-                  onClick={() => onOpenVenta()}
-                  className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[14px]">point_of_sale</span>
-                  + Vender
-                </button>
-              )}
-              <button
-                onClick={() => onOpenCompra()}
-                className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
-              >
-                + Nueva Compra
-              </button>
-            </div>
+            )}
+            <button
+              onClick={() => onOpenCompra()}
+              className="flex-1 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+              + Nueva Compra
+            </button>
           </div>
 
           {filteredBatches.length === 0 ? (
