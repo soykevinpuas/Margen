@@ -302,11 +302,12 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                     onOpenVenta?.(p.id);
                                   }}
                                   title="Vender este producto"
-                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
                                 >
-                                  <span className="material-symbols-outlined text-[18px]">
+                                  <span className="material-symbols-outlined text-[14px]">
                                     point_of_sale
                                   </span>
+                                  Vender
                                 </button>
                                 <button
                                   type="button"
@@ -315,11 +316,12 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                     onOpenCompra(p.id);
                                   }}
                                   title="Añadir stock"
-                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
                                 >
-                                  <span className="material-symbols-outlined text-[18px]">
+                                  <span className="material-symbols-outlined text-[14px]">
                                     add_shopping_cart
                                   </span>
+                                  Stock
                                 </button>
                               </div>
                             </div>
@@ -401,11 +403,12 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                     onOpenVenta?.(p.id);
                                   }}
                                   title="Vender este producto"
-                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
                                 >
-                                  <span className="material-symbols-outlined text-[18px]">
+                                  <span className="material-symbols-outlined text-[14px]">
                                     point_of_sale
                                   </span>
+                                  Vender
                                 </button>
                                 <button
                                   type="button"
@@ -414,11 +417,12 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                     onOpenCompra(p.id);
                                   }}
                                   title="Añadir stock"
-                                  className="text-on-surface-variant hover:text-primary transition-colors"
+                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
                                 >
-                                  <span className="material-symbols-outlined text-[18px]">
+                                  <span className="material-symbols-outlined text-[14px]">
                                     add_shopping_cart
                                   </span>
+                                  Stock
                                 </button>
                               </div>
                             </div>
