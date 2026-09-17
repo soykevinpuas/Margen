@@ -37,8 +37,8 @@ export const Rankings: React.FC<RankingsProps> = ({
 
   return (
     <div className="bg-surface-container rounded-xl border border-outline-variant overflow-hidden flex flex-col">
-      {/* Tabs */}
-      <div className="flex border-b border-outline-variant/30">
+      {/* Tabs: solo visibles en móvil; en md+ se muestran ambos rankings lado a lado */}
+      <div className="flex border-b border-outline-variant/30 md:hidden">
         <button
           onClick={() => setActiveTab('vendidos')}
           className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors ${
@@ -61,10 +61,21 @@ export const Rankings: React.FC<RankingsProps> = ({
         </button>
       </div>
 
-      {/* Lista del tab activo */}
-      <div className="flex flex-col divide-y divide-outline-variant/20 p-2">
-        {activeTab === 'vendidos' ? (
-          masVendidos.length === 0 ? (
+      {/* Rankings: en móvil solo el tab activo; en md+ ambos en 2 columnas */}
+      <div className="flex flex-col p-2 md:grid md:grid-cols-2 md:gap-2">
+        {/* Panel Más Vendidos */}
+        <div
+          className={
+            activeTab === 'vendidos'
+              ? 'flex flex-col divide-y divide-outline-variant/20'
+              : 'hidden md:flex md:flex-col md:divide-y md:divide-outline-variant/20'
+          }
+        >
+          {/* Mini encabezado visible solo en tablet+ */}
+          <div className="hidden md:flex items-center justify-center py-2 text-xs font-bold text-primary">
+            🔥 Más Vendidos
+          </div>
+          {masVendidos.length === 0 ? (
             emptyMessage
           ) : (
             masVendidos.map((item, idx) => (
@@ -100,42 +111,57 @@ export const Rankings: React.FC<RankingsProps> = ({
                 </span>
               </div>
             ))
-          )
-        ) : masRentables.length === 0 ? (
-          emptyMessage
-        ) : (
-          masRentables.map((item, idx) => (
-            <div key={item.product.id} className="flex items-center gap-3 p-2">
-              <div className="w-8 h-8 rounded-lg bg-surface-container-lowest flex items-center justify-center text-on-surface-variant text-xs font-bold border border-outline-variant">
-                {idx + 1}
-              </div>
-              <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant">
-                {item.product.imagen ? (
-                  <img
-                    src={item.product.imagen}
-                    alt={item.product.nombre}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="material-symbols-outlined text-on-surface-variant">
-                    inventory_2
+          )}
+        </div>
+
+        {/* Panel Más Rentables */}
+        <div
+          className={
+            activeTab === 'rentables'
+              ? 'flex flex-col divide-y divide-outline-variant/20'
+              : 'hidden md:flex md:flex-col md:divide-y md:divide-outline-variant/20'
+          }
+        >
+          {/* Mini encabezado visible solo en tablet+ */}
+          <div className="hidden md:flex items-center justify-center py-2 text-xs font-bold text-tertiary">
+            💰 Más Rentables
+          </div>
+          {masRentables.length === 0 ? (
+            emptyMessage
+          ) : (
+            masRentables.map((item, idx) => (
+              <div key={item.product.id} className="flex items-center gap-3 p-2">
+                <div className="w-8 h-8 rounded-lg bg-surface-container-lowest flex items-center justify-center text-on-surface-variant text-xs font-bold border border-outline-variant">
+                  {idx + 1}
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant">
+                  {item.product.imagen ? (
+                    <img
+                      src={item.product.imagen}
+                      alt={item.product.nombre}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-on-surface-variant">
+                      inventory_2
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-xs font-bold text-on-surface truncate">
+                    {item.product.nombre}
                   </span>
-                )}
-              </div>
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-xs font-bold text-on-surface truncate">
-                  {item.product.nombre}
-                </span>
-                <span className="text-[10px] text-tertiary font-bold">
-                  Ganancia: {formatMoney(item.profit)}
+                  <span className="text-[10px] text-tertiary font-bold">
+                    Ganancia: {formatMoney(item.profit)}
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-tertiary">
+                  +{formatMoney(item.profit)}
                 </span>
               </div>
-              <span className="text-xs font-bold text-tertiary">
-                +{formatMoney(item.profit)}
-              </span>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

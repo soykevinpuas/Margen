@@ -612,11 +612,11 @@ export const InicioView: React.FC<InicioViewProps> = ({
         </div>
 
         {showMore && (
-          <div className="flex flex-col gap-4 pt-1 animate-fade-in">
-            {/* Cinta Calendario (antes iba hasta arriba) */}
+          // "Ver más": 2 columnas en tablet+, la cinta Calendario ocupa todo el ancho
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 animate-fade-in">
             <div
               onClick={() => setIsCalendarioOpen(true)}
-              className="w-full bg-gradient-to-r from-primary/15 via-surface-container-high to-primary/15 border border-primary/40 py-2.5 px-3.5 rounded-xl shadow-md flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-lg transition-all group relative overflow-hidden"
+              className="w-full md:col-span-2 bg-gradient-to-r from-primary/15 via-surface-container-high to-primary/15 border border-primary/40 py-2.5 px-3.5 rounded-xl shadow-md flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-lg transition-all group relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-12 h-12 bg-primary/5 rounded-full blur-xl pointer-events-none"></div>
 

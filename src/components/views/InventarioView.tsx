@@ -240,7 +240,8 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     <span className="material-symbols-outlined text-[16px]">trending_down</span>
                     Stock Bajo ({stockBajo.length})
                   </h2>
-                  <div className="flex flex-col gap-3">
+                  {/* Cards de Stock Bajo en 2 columnas en tablet+ */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {stockBajo.map((p) => {
                       const stock = getProductTotalStock(p.id, batches);
                       const badges = getProductBadges(p, batches, sales);
@@ -341,7 +342,8 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     <span className="material-symbols-outlined text-[16px]">inventory</span>
                     Disponibles ({disponibles.length})
                   </h2>
-                  <div className="flex flex-col gap-3">
+                  {/* Cards de Disponibles en 2 columnas en tablet+ */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {disponibles.map((p) => {
                       const stock = getProductTotalStock(p.id, batches);
                       const badges = getProductBadges(p, batches, sales);
@@ -743,7 +745,8 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Cards de Agotados en 2 columnas en tablet+ */}
               {agotados.map((p) => (
                 <div
                   key={p.id}

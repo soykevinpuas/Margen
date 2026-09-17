@@ -144,7 +144,8 @@ export const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-background text-on-surface font-sans flex flex-col items-center justify-start antialiased selection:bg-primary selection:text-on-primary">
       {/* Mobile Shell Frame max width on desktop for responsive elegance */}
-      <div className="w-full max-w-md min-h-screen flex flex-col relative bg-surface border-x border-outline-variant/30 shadow-2xl">
+      {/* Shell: contenido centrado y acotado en tablet+ */}
+      <div className="w-full max-w-md md:max-w-2xl lg:max-w-3xl min-h-screen flex flex-col relative bg-surface border-x border-outline-variant/30 shadow-2xl">
         {/* Top Sticky Header */}
         <Header
           currentTabTitle={tabTitles[activeTab]}

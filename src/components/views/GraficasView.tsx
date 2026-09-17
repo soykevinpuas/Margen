@@ -229,7 +229,8 @@ export const GraficasView: React.FC = () => {
     : chartPoints.reduce((sum, p) => sum + p.gananciaReal, 0);
 
   return (
-    <div className="flex flex-col w-full gap-4 px-4 py-4 pb-24">
+    <div className="flex flex-col w-full max-w-2xl lg:max-w-3xl mx-auto gap-4 px-4 py-4 pb-24">
+      {/* Overlay de gráficas: ancho contenido en tablet+ */}
       {/* Resumen principal: Ingresos vs Beneficios */}
       <div className="bg-surface-container rounded-xl p-4 shadow-sm flex flex-col gap-3 border border-outline-variant">
         <div className="flex justify-between items-center">
