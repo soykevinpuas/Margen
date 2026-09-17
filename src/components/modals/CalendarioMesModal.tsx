@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatMoney, getLocalDateKey } from '../../utils/calculations';
+import { formatMoney, getLocalDateKey, getProductUnitLabel } from '../../utils/calculations';
 
 interface CalendarioMesModalProps {
   isOpen: boolean;
@@ -349,7 +349,7 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                             <div className="text-[9px] text-on-surface-variant flex items-center gap-1">
                               <span className="font-mono">#{s.id.slice(-5)}</span>
                               <span>•</span>
-                              <span>{s.cantidad} u.</span>
+                              <span>{s.cantidad} {getProductUnitLabel(product, settings)}</span>
                             </div>
                           </div>
                         </div>
@@ -416,7 +416,7 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                 </div>
                 <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
                   <div className="text-[9px] text-on-surface-variant font-bold uppercase">Artículos vendidos</div>
-                  <div className="font-bold text-on-surface">{monthUnits} u.</div>
+                  <div className="font-bold text-on-surface">{monthUnits}</div>
                 </div>
                 <div className="bg-surface-container-high rounded-lg p-1.5 border border-outline-variant/30">
                   <div className="text-[9px] text-on-surface-variant font-bold uppercase">Ticket promedio</div>

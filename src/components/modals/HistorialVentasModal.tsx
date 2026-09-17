@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatMoney, getLocalDateKey } from '../../utils/calculations';
+import { formatMoney, getLocalDateKey, getProductUnitLabel } from '../../utils/calculations';
 
 interface HistorialVentasModalProps {
   isOpen: boolean;
@@ -166,7 +166,7 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
                           {product ? product.nombre : 'Producto no encontrado'}
                         </h4>
                         <p className="text-[10px] text-on-surface-variant truncate">
-                          {new Date(sale.fecha).toLocaleString()} • {sale.cantidad} u.
+                          {new Date(sale.fecha).toLocaleString()} • {sale.cantidad} {getProductUnitLabel(product, settings)}
                         </p>
                       </div>
                     </div>
@@ -200,7 +200,7 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
                     </div>
                     {(sale.asignacionesLotes || []).map((alloc) => (
                       <div key={alloc.loteId} className="flex justify-between">
-                        <span>Lote {alloc.loteId}: {alloc.cantidadTomada} unidades</span>
+                        <span>Lote {alloc.loteId}: {alloc.cantidadTomada} {getProductUnitLabel(product, settings)}</span>
                         <span>@{formatMoney(alloc.costoUnitarioLoteSnapshotMXN ?? 0, displayCurrency, exchangeRate)}/u</span>
                       </div>
                     ))}

@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { LogOut, UserCheck, Shield, Key } from 'lucide-react';
 import { ExportExcelModal } from './ExportExcelModal';
+import { PRIMARY_COLORS, BACKGROUND_COLORS } from '../../data/themeOptions';
 
 interface ConfiguracionModalProps {
   isOpen: boolean;
@@ -28,6 +29,9 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
   );
   const [primaryColor, setPrimaryColor] = useState(settings?.primaryColor || 'emerald');
   const [backgroundColor, setBackgroundColor] = useState(settings?.backgroundColor || 'dark');
+  const [unidadPredeterminada, setUnidadPredeterminada] = useState(
+    settings?.unidadPredeterminada || 'und'
+  );
   const [chartType, setChartType] = useState<'barras' | 'lineas' | 'puntos' | 'radial'>(
     settings?.chartType || 'barras'
   );
@@ -44,29 +48,14 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
       setMinStockDefault((settings.defaultMinStock ?? 2).toString());
       setPrimaryColor(settings.primaryColor || 'emerald');
       setBackgroundColor(settings.backgroundColor || 'dark');
+      setUnidadPredeterminada(settings.unidadPredeterminada || 'und');
       setChartType(settings.chartType || 'barras');
     }
   }, [isOpen, settings]);
 
-  const themeOptions = [
-    { id: 'emerald', name: 'Esmeralda', hex: '#10b981', bgClass: 'bg-[#10b981]' },
-    { id: 'violet', name: 'Violeta', hex: '#8b5cf6', bgClass: 'bg-[#8b5cf6]' },
-    { id: 'blue', name: 'Cobalto', hex: '#3b82f6', bgClass: 'bg-[#3b82f6]' },
-    { id: 'amber', name: 'Ámbar', hex: '#f59e0b', bgClass: 'bg-[#f59e0b]' },
-    { id: 'rose', name: 'Rosa Cobre', hex: '#f43f5e', bgClass: 'bg-[#f43f5e]' },
-    { id: 'teal', name: 'Turquesa', hex: '#14b8a6', bgClass: 'bg-[#14b8a6]' },
-  ];
+  const themeOptions = PRIMARY_COLORS;
 
-  const bgOptions = [
-    { id: 'dark', name: 'Oscuro Margen', colorHex: '#090d16' },
-    { id: 'black', name: 'Negro Absoluto', colorHex: '#000000' },
-    { id: 'charcoal', name: 'Gris Carbón', colorHex: '#121212' },
-    { id: 'midnight', name: 'Azul Noche', colorHex: '#0b132b' },
-    { id: 'zinc', name: 'Gris Grafito', colorHex: '#18181b' },
-    { id: 'warm', name: 'Sombra Cálida', colorHex: '#1c1917' },
-    { id: 'slate', name: 'Azul Abismo', colorHex: '#0f172a' },
-    { id: 'emerald_dark', name: 'Verde Oscuro', colorHex: '#051c14' },
-  ];
+  const bgOptions = BACKGROUND_COLORS;
 
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -96,6 +85,7 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
       primaryColor,
       backgroundColor,
       chartType,
+      unidadPredeterminada: unidadPredeterminada.trim() || 'und',
     });
     setIsSaving(false);
     onClose();
@@ -276,6 +266,28 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
               onChange={(e) => setMinStockDefault(e.target.value)}
               className="w-full h-10 bg-surface-container border border-outline-variant text-on-surface rounded-lg px-3 font-bold focus:outline-none focus:border-primary"
             />
+          </div>
+
+          <div>
+            <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] mb-1">
+              Unidad Predeterminada
+            </label>
+            <input
+              type="text"
+              list="config-unit-suggestions"
+              placeholder="Ej. pza, kg, und..."
+              value={unidadPredeterminada}
+              onChange={(e) => setUnidadPredeterminada(e.target.value)}
+              className="w-full h-10 bg-surface-container border border-outline-variant text-on-surface rounded-lg px-3 font-bold focus:outline-none focus:border-primary"
+            />
+            <datalist id="config-unit-suggestions">
+              {['pza', 'kg', 'ml', 'und', 'l', 'm', 'caja', 'par', 'docena', 'bolsa', 'botella', 'sobre', 'pieza', 'litro', 'gramo', 'metro'].map((u) => (
+                <option key={u} value={u} />
+              ))}
+            </datalist>
+            <p className="text-[9px] text-on-surface-variant mt-1">
+              Se usa cuando un producto no define su propia unidad.
+            </p>
           </div>
 
           {/* Tipo de Gráficas */}

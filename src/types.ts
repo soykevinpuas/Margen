@@ -10,6 +10,8 @@ export interface AppSettings {
   primaryColor?: string;
   backgroundColor?: string;
   chartType?: 'barras' | 'lineas' | 'puntos' | 'radial';
+  unidadPredeterminada?: string;
+  setupCompletado?: boolean;
 }
 
 export interface Category {
@@ -30,6 +32,7 @@ export interface Product {
   precioSugerido?: number; // In MXN
   stockMinimo: number;
   imagen?: string;
+  unidad?: string;
   archivado: boolean;
   createdAt: string;
 }

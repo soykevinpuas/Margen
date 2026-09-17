@@ -29,6 +29,7 @@ export interface ColumnMap {
   precio: number;
   stockMinimo: number;
   fecha: number;
+  unidad: number;
 }
 
 // Detecta las columnas esperadas (acepta headers en español/inglés) o null si falta "Nombre"
@@ -57,8 +58,11 @@ export function detectColumns(headers: unknown[]): ColumnMap | null {
   const precio = findCol((h) => (h.includes('precio') || h.includes('price')) && !h.includes('costo'));
   const stockMinimo = findCol((h) => h.includes('stock') && h.includes('min'));
   const fecha = findCol((h) => h.includes('fecha') || h.includes('date'));
+  const unidad = findCol((h) =>
+    ['unidad', 'unit', 'medida', 'um'].includes(h)
+  );
 
-  return { nombre, categoria, cantidad, costo, precio, stockMinimo, fecha };
+  return { nombre, categoria, cantidad, costo, precio, stockMinimo, fecha, unidad };
 }
 
 // Convierte un número a number válido o null
@@ -212,6 +216,12 @@ export function validateFileRows(
     const precio =
       cols.precio >= 0 ? parseNumber(getCell(row, cols.precio)) : null;
 
+    // Unidad opcional: normalizada (trim + minúsculas) o undefined si vacía
+    const unidadRaw = cols.unidad >= 0 ? String(getCell(row, cols.unidad) ?? '').trim() : '';
+    let unidad = unidadRaw ? unidadRaw.toLowerCase() : undefined;
+    // Descarta unidades de más de 20 caracteres (se usa la predeterminada)
+    if (unidad && unidad.length > 20) unidad = undefined;
+
     validRows.push({
       nombre: nombreRaw,
       categoriaNombre: String(getCell(row, cols.categoria) ?? '').trim() || 'General',
@@ -220,6 +230,7 @@ export function validateFileRows(
       precioSugerido: precio !== null && precio >= 0 ? precio : undefined,
       stockMinimo,
       fecha,
+      unidad,
     });
   });
 
@@ -342,7 +353,8 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({ isOpen, onCl
               <strong className="text-on-surface">Nombre*</strong>, Categoria,{' '}
               <strong className="text-on-surface">Cantidad*</strong>,{' '}
               <strong className="text-on-surface">Costo unitario*</strong> (MXN), Precio venta,
-              Stock minimo y Fecha compra. Límite de <strong className="text-on-surface">250 filas</strong>.
+              Stock minimo, Fecha compra y <strong className="text-on-surface">Unidad</strong> (opcional:
+              unidad/unit/medida/um). Límite de <strong className="text-on-surface">250 filas</strong>.
             </p>
           </div>
 

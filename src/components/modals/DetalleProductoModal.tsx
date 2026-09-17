@@ -6,6 +6,7 @@ import {
   getProductAverageCost,
   getProductBadges,
   calculateFifoAllocation,
+  getProductUnitLabel,
 } from '../../utils/calculations';
 
 interface DetalleProductoModalProps {
@@ -156,7 +157,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                     totalStock === 0 ? 'text-error' : 'text-primary'
                   }`}
                 >
-                  {totalStock} unidades
+                  {totalStock} {getProductUnitLabel(product, settings)}
                 </span>
               </div>
             </div>
@@ -264,7 +265,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                         </div>
 
                         <span className="font-bold text-xs text-on-surface">
-                          {batch.cantidadDisponible} / {batch.cantidadComprada} u.
+                          {batch.cantidadDisponible} / {batch.cantidadComprada} {getProductUnitLabel(product, settings)}
                         </span>
                       </div>
 
@@ -368,7 +369,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                         {sale.id}
                       </span>
                       <span className="text-on-surface-variant ml-2">
-                        {sale.cantidad} und. •{' '}
+                        {sale.cantidad} {getProductUnitLabel(product, settings)} •{' '}
                         {new Date(sale.fecha).toLocaleDateString()}
                       </span>
                     </div>

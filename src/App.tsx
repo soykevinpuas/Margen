@@ -19,9 +19,12 @@ import { AjusteInventarioModal } from './components/modals/AjusteInventarioModal
 import { NuevoProductoModal } from './components/modals/NuevoProductoModal';
 import { ConfiguracionModal } from './components/modals/ConfiguracionModal';
 import { AuthModal } from './components/modals/AuthModal';
+import { SetupInicialModal } from './components/modals/SetupInicialModal';
+import { useApp } from './context/AppContext';
 
 export const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
+  const { settings, settingsReady, updateSettings } = useApp();
   const [viewMode, setViewMode] = useState<'app' | 'landing'>('app');
   const [activeTab, setActiveTab] = useState<TabType>('inicio');
 
@@ -269,6 +272,12 @@ export const AppContent: React.FC = () => {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
+      />
+
+      {/* Setup inicial guiado: se muestra en el primer acceso hasta completarlo u omitirlo */}
+      <SetupInicialModal
+        isOpen={!!user && settingsReady && !settings.setupCompletado}
+        onClose={() => updateSettings({ setupCompletado: true })}
       />
     </div>
   );

@@ -7,6 +7,7 @@ import {
   getProductTotalStock,
   getProductBadges,
   getLocalDateKey,
+  getProductUnitLabel,
 } from '../../utils/calculations';
 
 interface InventarioViewProps {
@@ -270,7 +271,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   {p.nombre}
                                 </h3>
                                 <span className="text-[10px] bg-tertiary/10 text-tertiary px-1.5 py-0.5 rounded border border-tertiary/20 whitespace-nowrap ml-2 font-bold">
-                                  {stock} und
+                                  {stock} {getProductUnitLabel(p, settings)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5 mt-0.5">
@@ -371,7 +372,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   {p.nombre}
                                 </h3>
                                 <span className="text-[10px] bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded border border-outline-variant whitespace-nowrap ml-2 font-bold">
-                                  {stock} und
+                                  {stock} {getProductUnitLabel(p, settings)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5 mt-0.5">
@@ -540,7 +541,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
                     <div className="text-right">
                       <div className="text-xs font-bold text-on-surface">
-                        {batch.cantidadDisponible} / {batch.cantidadComprada} u.
+                        {batch.cantidadDisponible} / {batch.cantidadComprada} {getProductUnitLabel(product, settings)}
                       </div>
                       <div className="text-[10px] text-tertiary font-bold mt-0.5">
                         Costo Real/u:{' '}
@@ -777,7 +778,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                           {p.nombre}
                         </h3>
                         <span className="text-[10px] bg-error/10 text-error px-1.5 py-0.5 rounded border border-error/20 whitespace-nowrap ml-2 font-bold">
-                          0 und
+                          0 {getProductUnitLabel(p, settings)}
                         </span>
                       </div>
                       <p className="text-[11px] text-on-surface-variant truncate">

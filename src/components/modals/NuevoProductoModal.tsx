@@ -26,6 +26,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
   const [precioSugerido, setPrecioSugerido] = useState('');
   const [stockMinimo, setStockMinimo] = useState<number | string>(settings.defaultMinStock ?? 3);
   const [imagen, setImagen] = useState('');
+  const [unidad, setUnidad] = useState(settings.unidadPredeterminada || 'und');
 
   // New category creation inline
   const [newCatName, setNewCatName] = useState('');
@@ -42,6 +43,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
         setPrecioSugerido(existingProduct.precioSugerido != null ? String(existingProduct.precioSugerido) : '');
         setStockMinimo(existingProduct.stockMinimo);
         setImagen(existingProduct.imagen || '');
+        setUnidad(existingProduct.unidad || settings.unidadPredeterminada || 'und');
       } else {
         setNombre('');
         setCategoriaId(defaultCatId);
@@ -49,6 +51,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
         setPrecioSugerido('');
         setStockMinimo(settings.defaultMinStock ?? 3);
         setImagen('');
+        setUnidad(settings.unidadPredeterminada || 'und');
       }
     }
   }, [isOpen, editingProductId, existingProduct, categories]);
@@ -87,6 +90,13 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
         productPayload.precioSugerido = parseFloat(precioSugerido);
       }
       if (imagen.trim()) productPayload.imagen = imagen.trim();
+      if (isEditing) {
+        // En edición siempre se escribe la unidad (vacío → undefined para volver a la predeterminada)
+        productPayload.unidad = unidad.trim() || undefined;
+      } else if (unidad.trim()) {
+        // En creación solo se guarda si el usuario escribió una
+        productPayload.unidad = unidad.trim();
+      }
 
       if (isEditing && editingProductId) {
         updateProduct(editingProductId, productPayload);
@@ -263,6 +273,28 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
                 className="w-full h-10 bg-surface-container border border-outline-variant text-on-surface rounded-lg px-3 text-xs focus:outline-none focus:border-primary"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] mb-1">
+              Unidad de Venta (Opcional)
+            </label>
+            <input
+              type="text"
+              list="product-unit-suggestions"
+              placeholder="Ej. pza, kg, und..."
+              value={unidad}
+              onChange={(e) => setUnidad(e.target.value)}
+              className="w-full h-10 bg-surface-container border border-outline-variant text-on-surface rounded-lg px-3 text-xs font-bold focus:outline-none focus:border-primary"
+            />
+            <datalist id="product-unit-suggestions">
+              {['pza', 'kg', 'ml', 'und', 'l', 'm', 'caja', 'par', 'docena', 'bolsa', 'botella', 'sobre', 'pieza', 'litro', 'gramo', 'metro'].map((u) => (
+                <option key={u} value={u} />
+              ))}
+            </datalist>
+            <p className="text-[9px] text-on-surface-variant mt-1">
+              Si se deja vacío se usa la unidad predeterminada del negocio.
+            </p>
           </div>
 
           <div className="pt-2">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatMoney } from '../../utils/calculations';
+import { formatMoney, getProductUnitLabel } from '../../utils/calculations';
 import { ExpenseItem } from '../../types';
 
 interface NuevaCompraModalProps {
@@ -54,6 +54,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
     expenses: ExpenseItem[];
     isInitialInventory?: boolean;
     date: string;
+    unit: string;
   } | null>(null);
 
   // Reset all modal form fields
@@ -212,6 +213,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
           expenses: expenses.filter((e) => e.montoMXN > 0),
           isInitialInventory,
           date,
+          unit: getProductUnitLabel(nuevo, settings),
         });
         setIsConfirmed(true);
       } else {
@@ -246,6 +248,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
         expenses: expenses.filter((e) => e.montoMXN > 0),
         isInitialInventory,
         date,
+        unit: getProductUnitLabel(selectedProd, settings),
       });
       setIsConfirmed(true);
     } else {
@@ -335,7 +338,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
                     Cantidad Adquirida
                   </span>
                   <span className="text-base font-extrabold text-on-surface">
-                    {lastPurchaseInfo.quantity} <span className="text-xs font-normal">und.</span>
+                    {lastPurchaseInfo.quantity} <span className="text-xs font-normal">{lastPurchaseInfo.unit}</span>
                   </span>
                 </div>
                 <div>
@@ -351,7 +354,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
               <div className="flex items-center justify-between text-xs pt-1">
                 <span className="text-on-surface-variant">Costo Real por Unidad:</span>
                 <span className="font-bold text-emerald-400">
-                  {formatMoney(lastPurchaseInfo.realUnitCostMXN, displayCurrency, exchangeRate)} / und.
+                  {formatMoney(lastPurchaseInfo.realUnitCostMXN, displayCurrency, exchangeRate)} / {lastPurchaseInfo.unit}
                 </span>
               </div>
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatMoney, getLocalDateKey } from '../../utils/calculations';
+import { formatMoney, getLocalDateKey, getProductUnitLabel } from '../../utils/calculations';
 import { PurchaseBatch } from '../../types';
 
 interface HistorialComprasModalProps {
@@ -211,7 +211,7 @@ export const HistorialComprasModal: React.FC<HistorialComprasModalProps> = ({
 
                     <div className="text-right">
                       <div className="text-xs font-bold text-on-surface">
-                        {batch.cantidadDisponible} / {batch.cantidadComprada} u.
+                        {batch.cantidadDisponible} / {batch.cantidadComprada} {getProductUnitLabel(product, settings)}
                       </div>
                       <div className="text-[10px] text-tertiary font-bold">
                         Costo Real/u:{' '}

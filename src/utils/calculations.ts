@@ -5,6 +5,7 @@ import {
   Sale,
   BatchAllocation,
   ProductBadge,
+  AppSettings,
 } from '../types';
 
 /**
@@ -215,5 +216,19 @@ export function getLocalDateKey(dateInput?: string | Date): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Devuelve la unidad de un producto (propia o predeterminada del negocio)
+ */
+export function getProductUnitLabel(
+  product?: Product | null,
+  settings?: AppSettings | null
+): string {
+  return (
+    product?.unidad?.trim() ||
+    settings?.unidadPredeterminada?.trim() ||
+    'und'
+  );
 }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AdjustmentReason } from '../../types';
-import { formatMoney } from '../../utils/calculations';
+import { formatMoney, getProductUnitLabel } from '../../utils/calculations';
 
 interface AjusteInventarioModalProps {
   isOpen: boolean;
@@ -48,6 +48,7 @@ export const AjusteInventarioModal: React.FC<AjusteInventarioModalProps> = ({
   if (!isOpen) return null;
 
   const selectedBatch = batches.find((b) => b.id === selectedBatchId);
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
   const maxAvailable = selectedBatch ? selectedBatch.cantidadDisponible : 0;
   const unitCost = selectedBatch ? selectedBatch.costoUnitarioRealMXN : 0;
   const numericQty = Math.max(1, parseInt(String(quantity)) || 1);
@@ -148,7 +149,7 @@ export const AjusteInventarioModal: React.FC<AjusteInventarioModalProps> = ({
               >
                 {productBatches.map((b) => (
                   <option key={b.id} value={b.id}>
-                    Lote {b.id} (Disp: {b.cantidadDisponible} u. • Costo/u:{' '}
+                    Lote {b.id} (Disp: {b.cantidadDisponible} {getProductUnitLabel(selectedProduct, settings)} • Costo/u:{' '}
                     {formatMoney(b.costoUnitarioRealMXN, displayCurrency, exchangeRate)})
                   </option>
                 ))}

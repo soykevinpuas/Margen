@@ -4,6 +4,7 @@ import {
   formatMoney,
   getProductTotalStock,
   getLocalDateKey,
+  getProductUnitLabel,
 } from '../../utils/calculations';
 import { ChartRenderer, ChartDataPoint } from '../ChartRenderer';
 import { CalendarioMesModal } from '../modals/CalendarioMesModal';
@@ -798,7 +799,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                           return (
                             <div key={p.id} className="flex justify-between items-center text-[10px] border-b border-outline-variant/20 pb-1">
                               <span className="truncate font-medium text-on-surface max-w-[80px]">{p.nombre}</span>
-                              <span className={`font-bold ${st <= p.stockMinimo ? 'text-amber-400' : 'text-primary'}`}>{st} u.</span>
+                              <span className={`font-bold ${st <= p.stockMinimo ? 'text-amber-400' : 'text-primary'}`}>{st} {getProductUnitLabel(p, settings)}</span>
                             </div>
                           );
                         })

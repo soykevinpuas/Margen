@@ -42,6 +42,7 @@ export interface ImportRow {
   precioSugerido?: number;
   stockMinimo: number;
   fecha: string; // YYYY-MM-DD
+  unidad?: string;
 }
 
 // Resultado del import atómico con writeBatch
@@ -56,6 +57,7 @@ export interface ImportResult {
 
 interface AppContextType {
   settings: AppSettings;
+  settingsReady: boolean;
   categories: Category[];
   products: Product[];
   batches: PurchaseBatch[];
@@ -145,6 +147,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return initialSettings;
   });
+
+  // Indica que los settings ya se cargaron desde Firestore (evita parpadeo del setup)
+  const [settingsReady, setSettingsReady] = useState(false);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_categories`);
@@ -244,6 +249,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return merged;
         });
       }
+      // Marca los settings como listos tras la primera carga (exista o no el doc)
+      setSettingsReady(true);
     });
 
     // Categories
@@ -1021,6 +1028,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             Number.isFinite(row.precioSugerido) && row.precioSugerido >= 0
               ? row.precioSugerido
               : undefined,
+          // La unidad solo se asigna a productos nuevos (los existentes conservan la suya)
+          unidad: row.unidad,
           archivado: false,
           createdAt: now,
         };
@@ -1127,6 +1136,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         settings,
+        settingsReady,
         categories,
         products,
         batches,

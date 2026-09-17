@@ -4,6 +4,7 @@ import {
   formatMoney,
   getProductTotalStock,
   calculateFifoAllocation,
+  getProductUnitLabel,
 } from '../../utils/calculations';
 import { Product, SaleExpenseItem } from '../../types';
 
@@ -47,6 +48,7 @@ export const VentaModal: React.FC<VentaModalProps> = ({
     marginPct: number;
     expenses: SaleExpenseItem[];
     remainingStock: number;
+    unit: string;
   } | null>(null);
 
   // Evita re-preseleccionar un id ya consumido
@@ -184,6 +186,7 @@ export const VentaModal: React.FC<VentaModalProps> = ({
         marginPct,
         expenses: expenses.filter((e) => e.montoMXN > 0),
         remainingStock: Math.max(0, remainingStock),
+        unit: getProductUnitLabel(selectedProduct, settings),
       });
       // Limpia el formulario y pasa a la pantalla de éxito
       setSelectedProduct(null);
@@ -306,7 +309,7 @@ export const VentaModal: React.FC<VentaModalProps> = ({
                       Cantidad / Precio Unitario
                     </span>
                     <span className="text-xs font-bold text-on-surface block">
-                      {lastCompletedSaleInfo.quantity} und. × {formatMoney(lastCompletedSaleInfo.unitPrice, displayCurrency, exchangeRate)}
+                      {lastCompletedSaleInfo.quantity} {lastCompletedSaleInfo.unit} × {formatMoney(lastCompletedSaleInfo.unitPrice, displayCurrency, exchangeRate)}
                     </span>
                   </div>
                 </div>
@@ -332,7 +335,7 @@ export const VentaModal: React.FC<VentaModalProps> = ({
                   <div className="flex items-center justify-between">
                     <span>Stock Restante del Producto:</span>
                     <span className="font-bold text-on-surface">
-                      {lastCompletedSaleInfo.remainingStock} unidades
+                      {lastCompletedSaleInfo.remainingStock} {lastCompletedSaleInfo.unit}
                     </span>
                   </div>
 
@@ -434,7 +437,7 @@ export const VentaModal: React.FC<VentaModalProps> = ({
                           availableStock === 0 ? 'text-error' : 'text-on-surface'
                         }`}
                       >
-                        {availableStock} und.
+                        {availableStock} {getProductUnitLabel(selectedProduct, settings)}
                       </span>
                     </div>
 
@@ -811,7 +814,7 @@ export const VentaModal: React.FC<VentaModalProps> = ({
                             isOutOfStock ? 'text-error' : 'text-on-surface'
                           }`}
                         >
-                          {stock} u.
+                          {stock} {getProductUnitLabel(p, settings)}
                         </div>
                         {p.precioSugerido && (
                           <div className="text-[10px] text-tertiary font-medium">
