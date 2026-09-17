@@ -19,7 +19,7 @@ interface InicioViewProps {
   onOpenVenta: () => void;
   // Abre el historial de ventas (modal global)
   onOpenHistorialVentas: () => void;
-  onOpenCompra: () => void;
+  onOpenCompra: (productId?: string) => void;
   onOpenGasto: () => void;
   onSelectProduct: (productId: string) => void;
 }
@@ -519,7 +519,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onOpenCompra();
+                        onOpenCompra(p.id);
                       }}
                       title="Reponer stock"
                       className="px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors"
@@ -562,7 +562,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onOpenCompra();
+                          onOpenCompra(p.id);
                         }}
                         className="w-8 h-8 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center text-on-surface hover:text-primary transition-colors"
                       >

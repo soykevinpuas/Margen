@@ -175,7 +175,7 @@ export const AppContent: React.FC = () => {
                 setEditingProductId(null);
                 setIsNuevoProductoOpen(true);
               }}
-              onOpenCompra={() => handleOpenCompra()}
+              onOpenCompra={handleOpenCompra}
             />
           )}
 
