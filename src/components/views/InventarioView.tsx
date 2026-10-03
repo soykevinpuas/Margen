@@ -1,27 +1,23 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Product, PurchaseBatch } from '../../types';
-import { ImportExcelModal } from '../modals/ImportExcelModal';
 import {
   formatMoney,
   getProductTotalStock,
   getProductBadges,
   getLocalDateKey,
-  getProductUnitLabel,
 } from '../../utils/calculations';
 
 interface InventarioViewProps {
   onSelectProduct: (productId: string) => void;
   onOpenNuevoProducto: () => void;
-  onOpenCompra: (productId?: string) => void;
-  onOpenVenta?: (productId?: string) => void;
+  onOpenCompra: () => void;
 }
 
 export const InventarioView: React.FC<InventarioViewProps> = ({
   onSelectProduct,
   onOpenNuevoProducto,
   onOpenCompra,
-  onOpenVenta,
 }) => {
   const {
     settings,
@@ -37,7 +33,6 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'productos' | 'compras' | 'agotados'>('productos');
-  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Editing batch state
   const [editingBatch, setEditingBatch] = useState<PurchaseBatch | null>(null);
@@ -240,8 +235,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     <span className="material-symbols-outlined text-[16px]">trending_down</span>
                     Stock Bajo ({stockBajo.length})
                   </h2>
-                  {/* Cards de Stock Bajo en 2 columnas en tablet+ */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-3">
                     {stockBajo.map((p) => {
                       const stock = getProductTotalStock(p.id, batches);
                       const badges = getProductBadges(p, batches, sales);
@@ -272,7 +266,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   {p.nombre}
                                 </h3>
                                 <span className="text-[10px] bg-tertiary/10 text-tertiary px-1.5 py-0.5 rounded border border-tertiary/20 whitespace-nowrap ml-2 font-bold">
-                                  {stock} {getProductUnitLabel(p, settings)}
+                                  {stock} und
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5 mt-0.5">
@@ -296,36 +290,18 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   exchangeRate
                                 )}
                               </span>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenVenta?.(p.id);
-                                  }}
-                                  title="Vender este producto"
-                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    point_of_sale
-                                  </span>
-                                  Vender
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenCompra(p.id);
-                                  }}
-                                  title="Añadir stock"
-                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    add_shopping_cart
-                                  </span>
-                                  Stock
-                                </button>
-                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenCompra();
+                                }}
+                                title="Comprar stock"
+                                className="text-on-surface-variant hover:text-primary"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">
+                                  add_shopping_cart
+                                </span>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -342,8 +318,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     <span className="material-symbols-outlined text-[16px]">inventory</span>
                     Disponibles ({disponibles.length})
                   </h2>
-                  {/* Cards de Disponibles en 2 columnas en tablet+ */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-3">
                     {disponibles.map((p) => {
                       const stock = getProductTotalStock(p.id, batches);
                       const badges = getProductBadges(p, batches, sales);
@@ -374,7 +349,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   {p.nombre}
                                 </h3>
                                 <span className="text-[10px] bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded border border-outline-variant whitespace-nowrap ml-2 font-bold">
-                                  {stock} {getProductUnitLabel(p, settings)}
+                                  {stock} und
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5 mt-0.5">
@@ -398,36 +373,6 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   exchangeRate
                                 )}
                               </span>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenVenta?.(p.id);
-                                  }}
-                                  title="Vender este producto"
-                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    point_of_sale
-                                  </span>
-                                  Vender
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenCompra(p.id);
-                                  }}
-                                  title="Añadir stock"
-                                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary text-[10px] font-bold hover:bg-primary/25 active:scale-95 transition-all"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    add_shopping_cart
-                                  </span>
-                                  Stock
-                                </button>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -444,29 +389,15 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
       {/* TAB 2: HISTORIAL DE COMPRAS (LOTES) */}
       {activeTab === 'compras' && (
         <div className="px-4 py-4 flex flex-col gap-3 text-xs">
-          {/* Botones de acción simétricos (sin título de sección) */}
-          <div className="flex gap-1.5 mb-1">
+          <div className="flex justify-between items-center mb-1">
+            <h2 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px]">history_edu</span>
+              Lotes de Mercancía Comprada
+            </h2>
             <button
-              onClick={() => setIsImportOpen(true)}
-              className="flex-1 min-w-0 px-2 py-1.5 bg-surface-container-highest border border-outline-variant text-on-surface font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 text-center hover:bg-surface-variant transition-colors"
+              onClick={onOpenCompra}
+              className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
             >
-              <span className="material-symbols-outlined text-[14px]">file_upload</span>
-              Importar Excel
-            </button>
-            {onOpenVenta && (
-              <button
-                onClick={() => onOpenVenta()}
-                className="flex-1 min-w-0 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 text-center"
-              >
-                <span className="material-symbols-outlined text-[14px]">point_of_sale</span>
-                + Vender
-              </button>
-            )}
-            <button
-              onClick={() => onOpenCompra()}
-              className="flex-1 min-w-0 px-2 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 text-center"
-            >
-              <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
               + Nueva Compra
             </button>
           </div>
@@ -543,7 +474,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
                     <div className="text-right">
                       <div className="text-xs font-bold text-on-surface">
-                        {batch.cantidadDisponible} / {batch.cantidadComprada} {getProductUnitLabel(product, settings)}
+                        {batch.cantidadDisponible} / {batch.cantidadComprada} u.
                       </div>
                       <div className="text-[10px] text-tertiary font-bold mt-0.5">
                         Costo Real/u:{' '}
@@ -727,7 +658,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               Productos Agotados ({agotados.length})
             </h2>
             <button
-              onClick={() => onOpenCompra()}
+              onClick={onOpenCompra}
               className="px-3 py-1.5 bg-primary text-on-primary font-bold text-xs rounded-lg shadow-sm flex items-center gap-1"
             >
               + Reponer Stock
@@ -745,8 +676,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Cards de Agotados en 2 columnas en tablet+ */}
+            <div className="flex flex-col gap-3">
               {agotados.map((p) => (
                 <div
                   key={p.id}
@@ -781,7 +711,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                           {p.nombre}
                         </h3>
                         <span className="text-[10px] bg-error/10 text-error px-1.5 py-0.5 rounded border border-error/20 whitespace-nowrap ml-2 font-bold">
-                          0 {getProductUnitLabel(p, settings)}
+                          0 und
                         </span>
                       </div>
                       <p className="text-[11px] text-on-surface-variant truncate">
@@ -801,7 +731,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onOpenCompra(p.id);
+                          onOpenCompra();
                         }}
                         className="text-[11px] text-primary font-bold hover:underline"
                       >
@@ -824,11 +754,6 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
       >
         <span className="material-symbols-outlined text-[28px]">add</span>
       </button>
-
-      <ImportExcelModal
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-      />
     </div>
   );
 };

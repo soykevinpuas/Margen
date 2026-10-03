@@ -17,7 +17,6 @@ export const initialSettings: AppSettings = {
   primaryColor: 'emerald',
   backgroundColor: 'dark',
   chartType: 'barras',
-  unidadPredeterminada: 'und',
 };
 
 export const initialCategories: Category[] = [

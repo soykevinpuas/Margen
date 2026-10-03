@@ -6,7 +6,6 @@ import {
   getProductAverageCost,
   getProductBadges,
   calculateFifoAllocation,
-  getProductUnitLabel,
 } from '../../utils/calculations';
 
 interface DetalleProductoModalProps {
@@ -14,7 +13,6 @@ interface DetalleProductoModalProps {
   onClose: () => void;
   onOpenEditProduct: (productId: string) => void;
   onOpenNewBatchForProduct: (productId: string) => void;
-  onOpenSaleForProduct?: (productId: string) => void;
 }
 
 export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
@@ -22,7 +20,6 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
   onClose,
   onOpenEditProduct,
   onOpenNewBatchForProduct,
-  onOpenSaleForProduct,
 }) => {
   const {
     settings,
@@ -157,25 +154,11 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                     totalStock === 0 ? 'text-error' : 'text-primary'
                   }`}
                 >
-                  {totalStock} {getProductUnitLabel(product, settings)}
+                  {totalStock} unidades
                 </span>
               </div>
             </div>
           </div>
-
-          {/* Acción principal: vender este producto */}
-          {onOpenSaleForProduct && (
-            <button
-              type="button"
-              onClick={() => onOpenSaleForProduct?.(product.id)}
-              className="w-full py-3 bg-primary text-on-primary font-headline font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md hover:bg-primary/90 active:scale-[0.99] transition-all"
-            >
-              <span className="material-symbols-outlined text-[20px]">
-                point_of_sale
-              </span>
-              Vender este producto
-            </button>
-          )}
 
           {/* Key Financial Specs Grid */}
           <div className="grid grid-cols-2 gap-3">
@@ -265,7 +248,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                         </div>
 
                         <span className="font-bold text-xs text-on-surface">
-                          {batch.cantidadDisponible} / {batch.cantidadComprada} {getProductUnitLabel(product, settings)}
+                          {batch.cantidadDisponible} / {batch.cantidadComprada} u.
                         </span>
                       </div>
 
@@ -369,7 +352,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                         {sale.id}
                       </span>
                       <span className="text-on-surface-variant ml-2">
-                        {sale.cantidad} {getProductUnitLabel(product, settings)} •{' '}
+                        {sale.cantidad} und. •{' '}
                         {new Date(sale.fecha).toLocaleDateString()}
                       </span>
                     </div>

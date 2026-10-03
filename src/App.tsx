@@ -3,13 +3,14 @@ import { Header } from './components/Header';
 import { Navbar, TabType } from './components/Navbar';
 import { InicioView } from './components/views/InicioView';
 import { InventarioView } from './components/views/InventarioView';
+import { VenderView } from './components/views/VenderView';
+import { GraficasView } from './components/views/GraficasView';
 import { MasView } from './components/views/MasView';
 import { LandingPage } from './components/views/LandingPage';
 import { useAuth } from './context/AuthContext';
 
 // Modals
 import { NuevaCompraModal } from './components/modals/NuevaCompraModal';
-import { VentaModal } from './components/modals/VentaModal';
 import { NuevoGastoModal } from './components/modals/NuevoGastoModal';
 import { DetalleProductoModal } from './components/modals/DetalleProductoModal';
 import { HistorialVentasModal } from './components/modals/HistorialVentasModal';
@@ -19,18 +20,14 @@ import { AjusteInventarioModal } from './components/modals/AjusteInventarioModal
 import { NuevoProductoModal } from './components/modals/NuevoProductoModal';
 import { ConfiguracionModal } from './components/modals/ConfiguracionModal';
 import { AuthModal } from './components/modals/AuthModal';
-import { SetupInicialModal } from './components/modals/SetupInicialModal';
-import { useApp } from './context/AppContext';
 
 export const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
-  const { settings, settingsReady, updateSettings } = useApp();
   const [viewMode, setViewMode] = useState<'app' | 'landing'>('app');
   const [activeTab, setActiveTab] = useState<TabType>('inicio');
 
   // Modal States
   const [isCompraOpen, setIsCompraOpen] = useState(false);
-  const [isVentaOpen, setIsVentaOpen] = useState(false);
   const [isGastoOpen, setIsGastoOpen] = useState(false);
   const [isHistorialComprasOpen, setIsHistorialComprasOpen] = useState(false);
   const [isHistorialVentasOpen, setIsHistorialVentasOpen] = useState(false);
@@ -43,13 +40,14 @@ export const AppContent: React.FC = () => {
   // Selected entities for detail / edit
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [preselectedProductForSale, setPreselectedProductForSale] = useState<string | null>(null);
-  const [preselectedProductForCompra, setPreselectedProductForCompra] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   const tabTitles: Record<TabType, string> = {
     inicio: 'Inicio',
     inventario: 'Inventario',
-    mas: 'Más',
+    vender: 'Vender',
+    graficas: 'Gráficas & Reportes',
+    mas: 'Más Opciones',
   };
 
   const handleSelectProduct = (productId: string) => {
@@ -62,36 +60,9 @@ export const AppContent: React.FC = () => {
     setIsNuevoProductoOpen(true);
   };
 
-  // Abre el modal de venta, con producto opcional preseleccionado
-  const handleOpenVenta = (productId?: string) => {
-    setPreselectedProductForSale(productId ?? null);
-    setIsVentaOpen(true);
-  };
-
-  // Cierra la venta SIEMPRE limpiando la preselección
-  const handleCloseVenta = () => {
-    setIsVentaOpen(false);
-    setPreselectedProductForSale(null);
-  };
-
-  // Abre la compra, con producto opcional preseleccionado
-  const handleOpenCompra = (productId?: string) => {
+  const handleOpenNewBatchForProduct = (productId: string) => {
     setSelectedProductId(null);
-    setPreselectedProductForCompra(productId ?? null);
     setIsCompraOpen(true);
-  };
-
-  // Cierra la compra limpiando la preselección
-  const handleCloseCompra = () => {
-    setIsCompraOpen(false);
-    setPreselectedProductForCompra(null);
-  };
-
-  // Coordina: cierra la venta y abre el historial de ventas
-  const handleGoToHistory = () => {
-    setIsVentaOpen(false);
-    setPreselectedProductForSale(null);
-    setIsHistorialVentasOpen(true);
   };
 
   // 1. Loading State
@@ -144,8 +115,7 @@ export const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-background text-on-surface font-sans flex flex-col items-center justify-start antialiased selection:bg-primary selection:text-on-primary">
       {/* Mobile Shell Frame max width on desktop for responsive elegance */}
-      {/* Shell: contenido centrado y acotado en tablet+ */}
-      <div className="w-full max-w-md md:max-w-2xl lg:max-w-3xl min-h-screen flex flex-col relative bg-surface border-x border-outline-variant/30 shadow-2xl">
+      <div className="w-full max-w-md min-h-screen flex flex-col relative bg-surface border-x border-outline-variant/30 shadow-2xl">
         {/* Top Sticky Header */}
         <Header
           currentTabTitle={tabTitles[activeTab]}
@@ -157,14 +127,8 @@ export const AppContent: React.FC = () => {
         <main className="flex-1 pb-6">
           {activeTab === 'inicio' && (
             <InicioView
-              onNavigateTab={(tab) => {
-                if (tab === 'inventario' || tab === 'mas') setActiveTab(tab);
-              }}
-              // Abre el modal de venta global desde el botón Vender
-              onOpenVenta={() => handleOpenVenta()}
-              // Abre el historial de ventas desde la card "Ventas Registradas"
-              onOpenHistorialVentas={() => setIsHistorialVentasOpen(true)}
-              onOpenCompra={handleOpenCompra}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+              onOpenCompra={() => setIsCompraOpen(true)}
               onOpenGasto={() => setIsGastoOpen(true)}
               onSelectProduct={handleSelectProduct}
             />
@@ -173,19 +137,35 @@ export const AppContent: React.FC = () => {
           {activeTab === 'inventario' && (
             <InventarioView
               onSelectProduct={handleSelectProduct}
-              // Abre la venta global, con producto opcional preseleccionado
-              onOpenVenta={handleOpenVenta}
               onOpenNuevoProducto={() => {
                 setEditingProductId(null);
                 setIsNuevoProductoOpen(true);
               }}
-              onOpenCompra={handleOpenCompra}
+              onOpenCompra={() => setIsCompraOpen(true)}
             />
           )}
 
+          {activeTab === 'vender' && (
+            <VenderView
+              preselectedProductId={preselectedProductForSale}
+              onSaleSuccess={() => {
+                setPreselectedProductForSale(null);
+              }}
+              onGoToHistory={() => {
+                setIsHistorialVentasOpen(true);
+              }}
+              onOpenNuevoProducto={() => {
+                setEditingProductId(null);
+                setIsNuevoProductoOpen(true);
+              }}
+            />
+          )}
+
+          {activeTab === 'graficas' && <GraficasView />}
+
           {activeTab === 'mas' && (
             <MasView
-              onOpenCompra={() => handleOpenCompra()}
+              onOpenCompra={() => setIsCompraOpen(true)}
               onOpenGasto={() => setIsGastoOpen(true)}
               onOpenHistorialCompras={() => setIsHistorialComprasOpen(true)}
               onOpenHistorialVentas={() => setIsHistorialVentasOpen(true)}
@@ -203,8 +183,7 @@ export const AppContent: React.FC = () => {
       {/* MODALS */}
       <NuevaCompraModal
         isOpen={isCompraOpen}
-        onClose={handleCloseCompra}
-        preselectedProductId={preselectedProductForCompra ?? undefined}
+        onClose={() => setIsCompraOpen(false)}
         onOpenNuevoProducto={() => {
           setEditingProductId(null);
           setIsNuevoProductoOpen(true);
@@ -220,19 +199,7 @@ export const AppContent: React.FC = () => {
         productId={selectedProductId}
         onClose={() => setSelectedProductId(null)}
         onOpenEditProduct={handleOpenEditProduct}
-        onOpenNewBatchForProduct={(productId) => handleOpenCompra(productId)}
-        onOpenSaleForProduct={handleOpenVenta}
-      />
-
-      <VentaModal
-        isOpen={isVentaOpen}
-        onClose={handleCloseVenta}
-        preselectedProductId={preselectedProductForSale}
-        onGoToHistory={handleGoToHistory}
-        onOpenNuevoProducto={() => {
-          setEditingProductId(null);
-          setIsNuevoProductoOpen(true);
-        }}
+        onOpenNewBatchForProduct={handleOpenNewBatchForProduct}
       />
 
       <HistorialVentasModal
@@ -273,12 +240,6 @@ export const AppContent: React.FC = () => {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-      />
-
-      {/* Setup inicial guiado: se muestra en el primer acceso hasta completarlo u omitirlo */}
-      <SetupInicialModal
-        isOpen={!!user && settingsReady && !settings.setupCompletado}
-        onClose={() => updateSettings({ setupCompletado: true })}
       />
     </div>
   );
