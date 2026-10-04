@@ -1,5 +1,27 @@
 export type Currency = 'MXN' | 'USD';
 
+/**
+ * Un negocio (tenant) dentro de una cuenta de usuario.
+ * Vive en: users/{uid}/businesses/{businessId}
+ */
+export interface Business {
+  id: string;
+  nombre: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/**
+ * Perfil del usuario. Vive en: users/{uid}/profile/main
+ */
+export interface UserProfile {
+  activeBusinessId: string;
+  /** Marca de migración desde el esquema v1 (colecciones planas en users/{uid}/...) */
+  migratedFrom?: 'v1';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface AppSettings {
   businessName: string;
   displayCurrency: Currency;

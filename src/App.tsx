@@ -8,6 +8,7 @@ import { GraficasView } from './components/views/GraficasView';
 import { MasView } from './components/views/MasView';
 import { LandingPage } from './components/views/LandingPage';
 import { useAuth } from './context/AuthContext';
+import { useApp } from './context/AppContext';
 
 // Modals
 import { NuevaCompraModal } from './components/modals/NuevaCompraModal';
@@ -23,6 +24,7 @@ import { AuthModal } from './components/modals/AuthModal';
 
 export const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
+  const { businessLoading } = useApp();
   const [viewMode, setViewMode] = useState<'app' | 'landing'>('app');
   const [activeTab, setActiveTab] = useState<TabType>('inicio');
 
@@ -75,6 +77,20 @@ export const AppContent: React.FC = () => {
           </div>
         </div>
         <p className="text-xs font-semibold text-on-surface-variant">Cargando Margen...</p>
+      </div>
+    );
+  }
+
+  // 1.5. Business Loading State (switching business / first load)
+  if (user && businessLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 text-on-surface">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary to-secondary p-0.5 animate-bounce">
+          <div className="w-full h-full bg-surface rounded-[14px] flex items-center justify-center font-extrabold text-primary text-lg">
+            %
+          </div>
+        </div>
+        <p className="text-xs font-semibold text-on-surface-variant">Cargando negocio...</p>
       </div>
     );
   }

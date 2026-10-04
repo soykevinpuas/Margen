@@ -15,7 +15,17 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
   onClose,
   onOpenAuth,
 }) => {
-  const { settings, updateSettings, resetToSeedData, clearAllData } = useApp();
+  const {
+    settings,
+    updateSettings,
+    resetToSeedData,
+    clearAllData,
+    businesses,
+    currentBusinessId,
+    businessLoading,
+    createBusiness,
+    switchBusiness,
+  } = useApp();
   const { user, logout } = useAuth();
 
   const [businessName, setBusinessName] = useState(settings?.businessName || 'Margen');
@@ -82,7 +92,50 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
   const [loadingStepText, setLoadingStepText] = useState('');
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
 
+  // Multi-business state
+  const [newBusinessName, setNewBusinessName] = useState('');
+  const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
+  const [businessError, setBusinessError] = useState<string | null>(null);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const handleCreateBusiness = async (e?: React.SyntheticEvent) => {
+    e?.preventDefault();
+    const trimmed = newBusinessName.trim();
+    if (!trimmed) {
+      setBusinessError('Escribe un nombre para el negocio.');
+      return;
+    }
+    if (isCreatingBusiness || businessLoading) return;
+
+    setBusinessError(null);
+    setIsCreatingBusiness(true);
+    try {
+      await createBusiness(trimmed);
+      setNewBusinessName('');
+    } catch (err) {
+      console.error('Error creating business:', err);
+      setBusinessError('No se pudo crear el negocio. Intenta de nuevo.');
+    } finally {
+      setIsCreatingBusiness(false);
+    }
+  };
+
+  const handleSwitchBusiness = async (id: string) => {
+    if (id === currentBusinessId || switchingId || businessLoading) return;
+    setBusinessError(null);
+    setSwitchingId(id);
+    try {
+      await switchBusiness(id);
+      onClose();
+    } catch (err) {
+      console.error('Error switching business:', err);
+      setBusinessError('No se pudo cambiar de negocio. Intenta de nuevo.');
+    } finally {
+      setSwitchingId(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +210,7 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
                 Configuración del Negocio
               </h2>
               <p className="text-[10px] text-on-surface-variant">
-                Preferencias de moneda, usuario y base de datos
+                Negocios, moneda, usuario y base de datos
               </p>
             </div>
           </div>
@@ -171,6 +224,139 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4 text-xs overflow-y-auto flex-1">
+          {/* Mis Negocios */}
+          <div className="p-3 bg-surface-container border border-outline/30 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[14px] text-primary">storefront</span>
+                Mis Negocios
+              </span>
+              {businessLoading ? (
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary animate-pulse">
+                  <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  Cargando...
+                </span>
+              ) : (
+                <span className="text-[10px] text-on-surface-variant font-medium">
+                  {businesses.length} {businesses.length === 1 ? 'negocio' : 'negocios'}
+                </span>
+              )}
+            </div>
+
+            {/* Lista de negocios */}
+            {businesses.length === 0 && !businessLoading ? (
+              <p className="text-[11px] text-on-surface-variant pt-1">
+                Aún no tienes negocios creados. Crea el primero aquí abajo.
+              </p>
+            ) : (
+              <div className="space-y-1.5 pt-0.5">
+                {businesses.map((biz) => {
+                  const isActive = biz.id === currentBusinessId;
+                  const isSwitching = switchingId === biz.id;
+                  return (
+                    <div
+                      key={biz.id}
+                      className={`flex items-center justify-between gap-2 p-2.5 rounded-lg border transition-all ${
+                        isActive
+                          ? 'bg-primary/10 border-primary/40'
+                          : 'bg-surface-container-highest/50 border-outline-variant hover:border-outline'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span
+                          className={`material-symbols-outlined text-[16px] shrink-0 ${
+                            isActive ? 'text-primary' : 'text-on-surface-variant'
+                          }`}
+                        >
+                          {isActive ? 'check_circle' : 'storefront'}
+                        </span>
+                        <span
+                          className={`text-[11px] font-bold truncate ${
+                            isActive ? 'text-on-surface' : 'text-on-surface-variant'
+                          }`}
+                        >
+                          {biz.nombre}
+                        </span>
+                      </div>
+
+                      {isActive ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-primary/15 text-primary border border-primary/30">
+                          Activo
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchBusiness(biz.id)}
+                          disabled={isSwitching || businessLoading || switchingId !== null}
+                          className="shrink-0 px-2.5 py-1 rounded-lg bg-surface-container border border-outline-variant text-[10px] font-bold text-on-surface hover:border-primary hover:text-primary transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1"
+                        >
+                          {isSwitching ? (
+                            <>
+                              <span className="w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              Abriendo...
+                            </>
+                          ) : (
+                            'Seleccionar'
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Crear negocio */}
+            <div className="pt-1 border-t border-outline-variant/40 space-y-1.5">
+              <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[9px] mt-1">
+                Crear nuevo negocio
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newBusinessName}
+                  maxLength={60}
+                  placeholder="Nombre del negocio"
+                  onChange={(e) => {
+                    setNewBusinessName(e.target.value);
+                    if (businessError) setBusinessError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateBusiness(e);
+                  }}
+                  className="flex-1 min-w-0 h-9 bg-surface-container-highest border border-outline-variant text-on-surface rounded-lg px-3 font-bold text-[11px] placeholder:font-medium placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCreateBusiness()}
+                  disabled={isCreatingBusiness || businessLoading}
+                  className="shrink-0 px-3 h-9 bg-primary text-on-primary font-bold rounded-lg shadow-sm hover:opacity-95 active:scale-95 transition-all text-[11px] flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {isCreatingBusiness ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[14px]">add_business</span>
+                      Crear negocio
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[9px] text-on-surface-variant">
+                Cada negocio mantiene su propio inventario, ventas y configuración.
+              </p>
+              {businessError && (
+                <p className="text-[10px] text-error font-bold animate-fade-in flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[13px]">error</span>
+                  {businessError}
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Auth Section */}
           <div className="p-3 bg-surface-container border border-outline/30 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
@@ -401,7 +587,7 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSaving || isClearing || isResetting}
+              disabled={isSaving || isClearing || isResetting || isCreatingBusiness}
               className="w-full py-3 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:opacity-95 active:scale-95 transition-all text-xs flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSaving ? (

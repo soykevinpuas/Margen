@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   doc,
   collection,
@@ -6,12 +6,17 @@ import {
   deleteDoc,
   onSnapshot,
   getDocs,
+  getDoc,
   writeBatch,
+  type DocumentReference,
+  type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import {
   AppSettings,
+  Business,
+  UserProfile,
   Category,
   Product,
   PurchaseBatch,
@@ -41,6 +46,13 @@ interface AppContextType {
   sales: Sale[];
   operatingExpenses: OperatingExpense[];
   adjustments: InventoryAdjustment[];
+
+  // Multi-business
+  businesses: Business[];
+  currentBusinessId: string | null;
+  businessLoading: boolean;
+  createBusiness: (nombre: string) => Promise<Business>;
+  switchBusiness: (id: string) => Promise<void>;
 
   // Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
@@ -106,178 +118,619 @@ interface AppContextType {
 }
 
 const LOCAL_STORAGE_KEY = 'margen_app_state_v1';
+const DEFAULT_BUSINESS_ID = 'default';
+
+// Guest mode keys (namespaced per business)
+const GUEST_BUSINESSES_KEY = `${LOCAL_STORAGE_KEY}_businesses`;
+const GUEST_ACTIVE_KEY = `${LOCAL_STORAGE_KEY}_activeBusiness`;
+
+// The 7 per-business stores
+const DATA_SUFFIXES = [
+  'settings',
+  'categories',
+  'products',
+  'batches',
+  'sales',
+  'expenses',
+  'adjustments',
+] as const;
+
+// Legacy (v1) flat collections under users/{uid}/...
+const LEGACY_COLLECTIONS = [
+  'products',
+  'batches',
+  'sales',
+  'expenses',
+  'categories',
+  'adjustments',
+] as const;
+
+const FIRESTORE_WRITE_CHUNK = 400;
+
+const bizStorageKey = (businessId: string, suffix: string) =>
+  `${LOCAL_STORAGE_KEY}_${businessId}_${suffix}`;
+
+function readStorageJSON<T>(key: string): T | null {
+  const raw = localStorage.getItem(key);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (e) {
+    console.error('Error parsing localStorage key', key, e);
+    return null;
+  }
+}
+
+function readBizValue(businessId: string, suffix: string): unknown {
+  return readStorageJSON<unknown>(bizStorageKey(businessId, suffix));
+}
+
+/** Initializes a brand-new (guest) business with empty lists — no seed/demo data. */
+function initEmptyBizStorage(businessId: string) {
+  const emptyListSuffixes = DATA_SUFFIXES.filter((s) => s !== 'settings');
+  for (const suffix of emptyListSuffixes) {
+    const key = bizStorageKey(businessId, suffix);
+    if (localStorage.getItem(key) === null) {
+      localStorage.setItem(key, '[]');
+    }
+  }
+}
+
+/**
+ * Ensures the guest (unauthenticated) user has at least one local business.
+ * Also migrates legacy non-namespaced keys (margen_app_state_v1_*) into the
+ * default business namespace so old local data is not lost.
+ */
+function ensureGuestBusinesses(): Business[] {
+  const stored = readStorageJSON<Business[]>(GUEST_BUSINESSES_KEY);
+  if (Array.isArray(stored) && stored.length > 0) return stored;
+
+  const legacySettings = readStorageJSON<Partial<AppSettings>>(
+    `${LOCAL_STORAGE_KEY}_settings`
+  );
+  const business: Business = {
+    id: DEFAULT_BUSINESS_ID,
+    nombre: legacySettings?.businessName?.trim() || 'Mi Negocio',
+    createdAt: new Date().toISOString(),
+  };
+
+  for (const suffix of DATA_SUFFIXES) {
+    const legacyValue = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${suffix}`);
+    const namespacedKey = bizStorageKey(DEFAULT_BUSINESS_ID, suffix);
+    if (localStorage.getItem(namespacedKey) !== null) continue;
+    if (legacyValue !== null) {
+      // Preserve legacy (v1) guest data inside the default business namespace
+      localStorage.setItem(namespacedKey, legacyValue);
+    } else if (suffix !== 'settings') {
+      // The default business is born EMPTY (no seed/demo lists)
+      localStorage.setItem(namespacedKey, '[]');
+    }
+  }
+
+  localStorage.setItem(GUEST_BUSINESSES_KEY, JSON.stringify([business]));
+  if (!localStorage.getItem(GUEST_ACTIVE_KEY)) {
+    localStorage.setItem(GUEST_ACTIVE_KEY, DEFAULT_BUSINESS_ID);
+  }
+  return [business];
+}
+
+// Shifts seeded/static sales dates to today (guest seed behaviour)
+function shiftSalesDates(loaded: Sale[]): Sale[] {
+  const todayKey = getLocalDateKey(new Date());
+  const hasSaleToday = loaded.some((s) => s.fecha && getLocalDateKey(s.fecha) === todayKey);
+  if (hasSaleToday || loaded.length === 0) return loaded;
+
+  const newestSaleKey = loaded.reduce((max, s) => {
+    const key = getLocalDateKey(s.fecha);
+    return key > max ? key : max;
+  }, '');
+
+  if (!newestSaleKey || newestSaleKey >= todayKey) return loaded;
+
+  return loaded.map((s) =>
+    getLocalDateKey(s.fecha) === newestSaleKey ? { ...s, fecha: new Date().toISOString() } : s
+  );
+}
+
+function shiftExpensesDates(loaded: OperatingExpense[]): OperatingExpense[] {
+  const todayKey = getLocalDateKey(new Date());
+  const hasExpToday = loaded.some((e) => e.fecha && getLocalDateKey(e.fecha) === todayKey);
+  if (hasExpToday || loaded.length === 0) return loaded;
+
+  const newestExpKey = loaded.reduce((max, e) => {
+    const key = getLocalDateKey(e.fecha);
+    return key > max ? key : max;
+  }, '');
+
+  if (!newestExpKey || newestExpKey >= todayKey) return loaded;
+
+  return loaded.map((e) =>
+    getLocalDateKey(e.fecha) === newestExpKey ? { ...e, fecha: todayKey } : e
+  );
+}
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_settings`);
-    if (saved) {
-      try {
-        return { ...initialSettings, ...JSON.parse(saved) };
-      } catch (e) {
-        console.error('Error parsing saved settings', e);
+  // ---------- Data state ----------
+  const [settings, setSettings] = useState<AppSettings>(() => ({ ...initialSettings }));
+  const [categories, setCategories] = useState<Category[]>(() => [...initialCategories]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [batches, setBatches] = useState<PurchaseBatch[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [operatingExpenses, setOperatingExpenses] = useState<OperatingExpense[]>([]);
+  const [adjustments, setAdjustments] = useState<InventoryAdjustment[]>([]);
+
+  // ---------- Multi-business state ----------
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
+  const [businessLoading, setBusinessLoading] = useState<boolean>(true);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [guestHydrated, setGuestHydrated] = useState(false);
+  /** Business id the in-memory guest state belongs to (guards cross-business writes) */
+  const [guestHydratedBizId, setGuestHydratedBizId] = useState<string | null>(null);
+  const onboardingRef = useRef(false);
+  /** Generation counter: invalidates stale onSnapshot callbacks after a business switch */
+  const genRef = useRef(0);
+  /** uid the onboarding belongs to (cancels retries after logout/user change) */
+  const activeUidRef = useRef<string | null>(null);
+  const onboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ---------- Firestore path helpers (per business) ----------
+  const bizCol = (colName: string) => {
+    if (!user || !currentBusinessId) return null;
+    return collection(db, 'users', user.uid, 'businesses', currentBusinessId, colName);
+  };
+
+  const bizDoc = (colName: string, docId: string) => {
+    if (!user || !currentBusinessId) return null;
+    return doc(db, 'users', user.uid, 'businesses', currentBusinessId, colName, docId);
+  };
+
+  const profileDocRef = () => (user ? doc(db, 'users', user.uid, 'profile', 'main') : null);
+
+  // Helper to remove undefined properties before sending to Firestore
+  const safeSetDoc = (
+    docRef: DocumentReference<DocumentData>,
+    data: unknown,
+    options?: Parameters<typeof setDoc>[2]
+  ) => {
+    const cleanForFirestore = (obj: any): any => {
+      if (obj === null || obj === undefined) return null;
+      if (Array.isArray(obj)) {
+        return obj.map((item) => cleanForFirestore(item));
       }
-    }
-    return initialSettings;
-  });
-
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_categories`);
-    return saved ? JSON.parse(saved) : initialCategories;
-  });
-
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_products`);
-    return saved ? JSON.parse(saved) : initialProducts;
-  });
-
-  const [batches, setBatches] = useState<PurchaseBatch[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_batches`);
-    return saved ? JSON.parse(saved) : initialBatches;
-  });
-
-  const [sales, setSales] = useState<Sale[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_sales`);
-    let loaded: Sale[] = saved ? JSON.parse(saved) : initialSales;
-
-    // Check if sales are from old static dates (e.g., 2026-08-04) and shift them if no sales exist today
-    const todayKey = getLocalDateKey(new Date());
-    const hasSaleToday = loaded.some((s) => s.fecha && getLocalDateKey(s.fecha) === todayKey);
-
-    if (!hasSaleToday && loaded.length > 0) {
-      const newestSaleKey = loaded.reduce((max, s) => {
-        const key = getLocalDateKey(s.fecha);
-        return key > max ? key : max;
-      }, '');
-
-      if (newestSaleKey && newestSaleKey < todayKey) {
-        // Shift sales from newestSaleKey to today
-        loaded = loaded.map((s) => {
-          if (getLocalDateKey(s.fecha) === newestSaleKey) {
-            return { ...s, fecha: new Date().toISOString() };
+      if (typeof obj === 'object') {
+        const cleaned: Record<string, any> = {};
+        for (const key of Object.keys(obj)) {
+          if (obj[key] !== undefined) {
+            cleaned[key] = cleanForFirestore(obj[key]);
           }
-          return s;
-        });
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_sales`, JSON.stringify(loaded));
+        }
+        return cleaned;
       }
-    }
+      return obj;
+    };
+    return setDoc(docRef, cleanForFirestore(data), options).catch((err) =>
+      console.error('Firestore setDoc error:', err)
+    );
+  };
 
-    return loaded;
-  });
+  const resetDataState = () => {
+    setSettings({ ...initialSettings });
+    setCategories([]);
+    setProducts([]);
+    setBatches([]);
+    setSales([]);
+    setOperatingExpenses([]);
+    setAdjustments([]);
+  };
 
-  const [operatingExpenses, setOperatingExpenses] = useState<OperatingExpense[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_expenses`);
-    let loaded: OperatingExpense[] = saved ? JSON.parse(saved) : initialOperatingExpenses;
-
-    const todayKey = getLocalDateKey(new Date());
-    const hasExpToday = loaded.some((e) => e.fecha && getLocalDateKey(e.fecha) === todayKey);
-
-    if (!hasExpToday && loaded.length > 0) {
-      const newestExpKey = loaded.reduce((max, e) => {
-        const key = getLocalDateKey(e.fecha);
-        return key > max ? key : max;
-      }, '');
-
-      if (newestExpKey && newestExpKey < todayKey) {
-        loaded = loaded.map((e) => {
-          if (getLocalDateKey(e.fecha) === newestExpKey) {
-            return { ...e, fecha: todayKey };
-          }
-          return e;
-        });
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_expenses`, JSON.stringify(loaded));
-      }
-    }
-
-    return loaded;
-  });
-
-  const [adjustments, setAdjustments] = useState<InventoryAdjustment[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_adjustments`);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Sync with Firestore when user is authenticated
+  // ---------- Guest mode: resolve local business list ----------
   useEffect(() => {
-    if (!user) return;
+    if (authLoading || user) return;
+    const list = ensureGuestBusinesses();
+    const storedActive = localStorage.getItem(GUEST_ACTIVE_KEY);
+    const active =
+      storedActive && list.some((b) => b.id === storedActive) ? storedActive : list[0].id;
+    setBusinesses(list);
+    setCurrentBusinessId(active);
+  }, [authLoading, user]);
 
+  // ---------- Guest mode: hydrate data for the active local business ----------
+  useEffect(() => {
+    if (authLoading || user || !currentBusinessId) return;
+    // While hydrating, the in-memory state does NOT belong to the active business yet
+    setGuestHydrated(false);
+    const businessId = currentBusinessId;
+
+    const savedSettings = readBizValue(businessId, 'settings');
+    setSettings(
+      savedSettings
+        ? { ...initialSettings, ...(savedSettings as Partial<AppSettings>) }
+        : { ...initialSettings }
+    );
+
+    const savedCategories = readBizValue(businessId, 'categories');
+    setCategories(
+      Array.isArray(savedCategories) ? (savedCategories as Category[]) : [...initialCategories]
+    );
+
+    const savedProducts = readBizValue(businessId, 'products');
+    setProducts(
+      Array.isArray(savedProducts) ? (savedProducts as Product[]) : [...initialProducts]
+    );
+
+    const savedBatches = readBizValue(businessId, 'batches');
+    setBatches(Array.isArray(savedBatches) ? (savedBatches as PurchaseBatch[]) : [...initialBatches]);
+
+    const savedSales = readBizValue(businessId, 'sales');
+    setSales(
+      shiftSalesDates(
+        Array.isArray(savedSales) ? (savedSales as Sale[]) : [...initialSales]
+      )
+    );
+
+    const savedExpenses = readBizValue(businessId, 'expenses');
+    setOperatingExpenses(
+      shiftExpensesDates(
+        Array.isArray(savedExpenses)
+          ? (savedExpenses as OperatingExpense[])
+          : [...initialOperatingExpenses]
+      )
+    );
+
+    const savedAdjustments = readBizValue(businessId, 'adjustments');
+    setAdjustments(
+      Array.isArray(savedAdjustments) ? (savedAdjustments as InventoryAdjustment[]) : []
+    );
+
+    localStorage.setItem(GUEST_ACTIVE_KEY, businessId);
+    setGuestHydratedBizId(businessId);
+    setGuestHydrated(true);
+    setBusinessLoading(false);
+  }, [authLoading, user, currentBusinessId]);
+
+  // ---------- Lazy migration + default business creation ----------
+  const onboardUser = async (uid: string, attempt = 0) => {
+    if (onboardingRef.current) return;
+    onboardingRef.current = true;
+
+    try {
+      const businessesRef = collection(db, 'users', uid, 'businesses');
+      const existing = await getDocs(businessesRef);
+      if (!existing.empty) return; // already onboarded (idempotent)
+
+      type WriteOp = {
+        ref: DocumentReference<DocumentData>;
+        data: DocumentData;
+        merge?: boolean;
+      };
+      const ops: WriteOp[] = [];
+      let hasLegacyData = false;
+
+      // 1) Copy legacy v1 data into businesses/default/...
+      for (const colName of LEGACY_COLLECTIONS) {
+        const snap = await getDocs(collection(db, 'users', uid, colName));
+        if (!snap.empty) hasLegacyData = true;
+        snap.forEach((d) => {
+          ops.push({
+            ref: doc(db, 'users', uid, 'businesses', DEFAULT_BUSINESS_ID, colName, d.id),
+            data: d.data(),
+          });
+        });
+      }
+
+      const legacySettingsRef = doc(db, 'users', uid, 'settings', 'config');
+      const legacySettingsSnap = await getDoc(legacySettingsRef);
+      const legacySettings = legacySettingsSnap.exists()
+        ? (legacySettingsSnap.data() as Partial<AppSettings>)
+        : null;
+      if (legacySettingsSnap.exists()) {
+        hasLegacyData = true;
+        ops.push({
+          ref: doc(
+            db,
+            'users',
+            uid,
+            'businesses',
+            DEFAULT_BUSINESS_ID,
+            'settings',
+            'config'
+          ),
+          data: legacySettingsSnap.data(),
+        });
+      }
+
+      // 2) The default business doc itself
+      const now = new Date().toISOString();
+      const business: Business = {
+        id: DEFAULT_BUSINESS_ID,
+        nombre: legacySettings?.businessName?.trim() || 'Mi Negocio',
+        createdAt: now,
+      };
+      ops.push({
+        ref: doc(businessesRef, DEFAULT_BUSINESS_ID),
+        data: business as unknown as DocumentData,
+      });
+
+      // 3) Profile pointing at the default business (+ migration marker)
+      const profileData: UserProfile = {
+        activeBusinessId: DEFAULT_BUSINESS_ID,
+        createdAt: now,
+        updatedAt: now,
+        ...(hasLegacyData ? { migratedFrom: 'v1' as const } : {}),
+      };
+      ops.push({
+        ref: doc(db, 'users', uid, 'profile', 'main'),
+        data: profileData as unknown as DocumentData,
+        merge: true,
+      });
+
+      // 4) Commit in chunks (writeBatch limit is 500 ops)
+      for (let i = 0; i < ops.length; i += FIRESTORE_WRITE_CHUNK) {
+        const chunk = writeBatch(db);
+        ops.slice(i, i + FIRESTORE_WRITE_CHUNK).forEach((op) => {
+          chunk.set(op.ref, op.data, op.merge ? { merge: true } : undefined);
+        });
+        await chunk.commit();
+      }
+    } catch (err) {
+      // Retry with exponential backoff (1s, 2s, 4s) — the guard above allows a new run
+      const maxAttempts = 4;
+      console.error(
+        `Error creating/migrating default business (attempt ${attempt + 1}/${maxAttempts}):`,
+        err
+      );
+      onboardingRef.current = false;
+      if (attempt + 1 < maxAttempts && activeUidRef.current === uid) {
+        const delay = 1000 * 2 ** attempt;
+        if (onboardTimerRef.current) clearTimeout(onboardTimerRef.current);
+        onboardTimerRef.current = setTimeout(() => {
+          onboardTimerRef.current = null;
+          if (activeUidRef.current === uid) void onboardUser(uid, attempt + 1);
+        }, delay);
+      }
+    }
+  };
+
+  // ---------- Authenticated: subscribe profile + businesses ----------
+  useEffect(() => {
+    if (authLoading || !user) return;
     const uid = user.uid;
 
-    // Settings
-    const unsubSettings = onSnapshot(doc(db, 'users', uid, 'settings', 'config'), (snapshot) => {
-      if (snapshot.exists()) {
-        const loaded = snapshot.data() as AppSettings;
-        setSettings((prev) => {
-          const merged = { ...initialSettings, ...prev, ...loaded };
-          localStorage.setItem(`${LOCAL_STORAGE_KEY}_settings`, JSON.stringify(merged));
-          return merged;
-        });
-      } else {
-        setSettings((current) => {
-          const merged = { ...initialSettings, ...current };
-          safeSetDoc(doc(db, 'users', uid, 'settings', 'config'), merged);
-          return merged;
-        });
+    setBusinessLoading(true);
+    setGuestHydrated(false);
+    setGuestHydratedBizId(null);
+    setProfile(null);
+    setProfileLoaded(false);
+    setBusinesses([]);
+    setCurrentBusinessId(null);
+    resetDataState();
+    onboardingRef.current = false;
+    activeUidRef.current = uid;
+    if (onboardTimerRef.current) {
+      clearTimeout(onboardTimerRef.current);
+      onboardTimerRef.current = null;
+    }
+
+    const unsubProfile = onSnapshot(
+      doc(db, 'users', uid, 'profile', 'main'),
+      (snapshot) => {
+        setProfile(snapshot.exists() ? (snapshot.data() as UserProfile) : null);
+        setProfileLoaded(true);
+      },
+      (err) => {
+        console.error('Profile snapshot error:', err);
+        setProfileLoaded(true);
       }
-    });
+    );
 
-    // Categories
-    const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: Category[] = [];
-        snapshot.forEach((d) => list.push(d.data() as Category));
-        setCategories(list);
-      } else {
-        // Default minimal categories for new users
-        const defaultCat: Category = {
-          id: 'cat-general',
-          nombre: 'General',
-          archived: false,
-          createdAt: new Date().toISOString(),
-        };
-        setDoc(doc(db, 'users', uid, 'categories', defaultCat.id), defaultCat);
-      }
-    });
-
-    // Products
-    const unsubProducts = onSnapshot(collection(db, 'users', uid, 'products'), (snapshot) => {
-      const list: Product[] = [];
-      snapshot.forEach((d) => list.push(d.data() as Product));
-      setProducts(list);
-    });
-
-    // Batches
-    const unsubBatches = onSnapshot(collection(db, 'users', uid, 'batches'), (snapshot) => {
-      const list: PurchaseBatch[] = [];
-      snapshot.forEach((d) => list.push(d.data() as PurchaseBatch));
-      setBatches(list);
-    });
-
-    // Sales
-    const unsubSales = onSnapshot(collection(db, 'users', uid, 'sales'), (snapshot) => {
-      const list: Sale[] = [];
-      snapshot.forEach((d) => list.push(d.data() as Sale));
-      setSales(list);
-    });
-
-    // Expenses
-    const unsubExpenses = onSnapshot(collection(db, 'users', uid, 'expenses'), (snapshot) => {
-      const list: OperatingExpense[] = [];
-      snapshot.forEach((d) => list.push(d.data() as OperatingExpense));
-      setOperatingExpenses(list);
-    });
-
-    // Adjustments
-    const unsubAdjustments = onSnapshot(collection(db, 'users', uid, 'adjustments'), (snapshot) => {
-      const list: InventoryAdjustment[] = [];
-      snapshot.forEach((d) => list.push(d.data() as InventoryAdjustment));
-      setAdjustments(list);
-    });
+    const unsubBusinesses = onSnapshot(
+      collection(db, 'users', uid, 'businesses'),
+      (snapshot) => {
+        const list: Business[] = [];
+        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as Business));
+        setBusinesses(list);
+        if (snapshot.empty) {
+          // No business yet: create (and migrate legacy data into) 'default'
+          void onboardUser(uid);
+        }
+      },
+      (err) => console.error('Businesses snapshot error:', err)
+    );
 
     return () => {
+      unsubProfile();
+      unsubBusinesses();
+      if (activeUidRef.current === uid) activeUidRef.current = null;
+      if (onboardTimerRef.current) {
+        clearTimeout(onboardTimerRef.current);
+        onboardTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
+
+  // ---------- Resolve the active business from profile ----------
+  useEffect(() => {
+    if (authLoading || !user || !profileLoaded) return;
+
+    const target =
+      profile && businesses.some((b) => b.id === profile.activeBusinessId)
+        ? profile.activeBusinessId
+        : businesses[0]?.id ?? null;
+
+    if (!target) return;
+    if (currentBusinessId !== target) setCurrentBusinessId(target);
+
+    if (!profile || profile.activeBusinessId !== target) {
+      const pRef = profileDocRef();
+      if (pRef) {
+        const now = new Date().toISOString();
+        setProfile((prev) => ({
+          ...(prev ?? { createdAt: now }),
+          activeBusinessId: target,
+          updatedAt: now,
+        }));
+        safeSetDoc(pRef, { activeBusinessId: target, updatedAt: now }, { merge: true });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, profileLoaded, profile, businesses, currentBusinessId]);
+
+  // ---------- Authenticated: subscribe the 7 collections of the active business ----------
+  useEffect(() => {
+    if (authLoading || !user || !currentBusinessId) return;
+
+    const uid = user.uid;
+    const bizId = currentBusinessId;
+
+    // Generation guard: callbacks from a previous business/subscription are stale
+    const gen = ++genRef.current;
+    const isStale = () => gen !== genRef.current;
+
+    // Reset everything when the active business changes
+    setBusinessLoading(true);
+    resetDataState();
+
+    const settingsRef = doc(db, 'users', uid, 'businesses', bizId, 'settings', 'config');
+    const mkCol = (colName: string) => collection(db, 'users', uid, 'businesses', bizId, colName);
+    const categoriesRef = mkCol('categories');
+    const productsRef = mkCol('products');
+    const batchesRef = mkCol('batches');
+    const salesRef = mkCol('sales');
+    const expensesRef = mkCol('expenses');
+    const adjustmentsRef = mkCol('adjustments');
+
+    // businessLoading stays true until every listener has delivered its first snapshot
+    const pending = new Set<string>([
+      'settings',
+      'categories',
+      'products',
+      'batches',
+      'sales',
+      'expenses',
+      'adjustments',
+    ]);
+    const markReady = (key: string) => {
+      if (isStale()) return;
+      pending.delete(key);
+      if (pending.size === 0) setBusinessLoading(false);
+    };
+    const onErr = (label: string, key: string) => (err: unknown) => {
+      if (isStale()) return;
+      console.error(`${label} snapshot error:`, err);
+      markReady(key);
+    };
+
+    const unsubSettings = onSnapshot(
+      settingsRef,
+      (snapshot) => {
+        if (isStale()) return;
+        if (snapshot.exists()) {
+          const loaded = snapshot.data() as AppSettings;
+          setSettings((prev) => ({ ...initialSettings, ...prev, ...loaded }));
+        } else {
+          const fresh: AppSettings = { ...initialSettings };
+          setSettings(fresh);
+          safeSetDoc(settingsRef, fresh);
+        }
+        markReady('settings');
+      },
+      onErr('Settings', 'settings')
+    );
+
+    const unsubCategories = onSnapshot(
+      categoriesRef,
+      (snapshot) => {
+        if (isStale()) return;
+        if (!snapshot.empty) {
+          const list: Category[] = [];
+          snapshot.forEach((d) => list.push(d.data() as Category));
+          setCategories(list);
+        } else {
+          // Default minimal category for new businesses
+          const defaultCat: Category = {
+            id: 'cat-general',
+            nombre: 'General',
+            archived: false,
+            createdAt: new Date().toISOString(),
+          };
+          setDoc(doc(categoriesRef, defaultCat.id), defaultCat).catch((err) =>
+            console.error('Firestore setDoc error:', err)
+          );
+        }
+        markReady('categories');
+      },
+      onErr('Categories', 'categories')
+    );
+
+    const unsubProducts = onSnapshot(
+      productsRef,
+      (snapshot) => {
+        if (isStale()) return;
+        const list: Product[] = [];
+        snapshot.forEach((d) => list.push(d.data() as Product));
+        setProducts(list);
+        markReady('products');
+      },
+      onErr('Products', 'products')
+    );
+
+    const unsubBatches = onSnapshot(
+      batchesRef,
+      (snapshot) => {
+        if (isStale()) return;
+        const list: PurchaseBatch[] = [];
+        snapshot.forEach((d) => list.push(d.data() as PurchaseBatch));
+        setBatches(list);
+        markReady('batches');
+      },
+      onErr('Batches', 'batches')
+    );
+
+    const unsubSales = onSnapshot(
+      salesRef,
+      (snapshot) => {
+        if (isStale()) return;
+        const list: Sale[] = [];
+        snapshot.forEach((d) => list.push(d.data() as Sale));
+        setSales(list);
+        markReady('sales');
+      },
+      onErr('Sales', 'sales')
+    );
+
+    const unsubExpenses = onSnapshot(
+      expensesRef,
+      (snapshot) => {
+        if (isStale()) return;
+        const list: OperatingExpense[] = [];
+        snapshot.forEach((d) => list.push(d.data() as OperatingExpense));
+        setOperatingExpenses(list);
+        markReady('expenses');
+      },
+      onErr('Expenses', 'expenses')
+    );
+
+    const unsubAdjustments = onSnapshot(
+      adjustmentsRef,
+      (snapshot) => {
+        if (isStale()) return;
+        const list: InventoryAdjustment[] = [];
+        snapshot.forEach((d) => list.push(d.data() as InventoryAdjustment));
+        setAdjustments(list);
+        markReady('adjustments');
+      },
+      onErr('Adjustments', 'adjustments')
+    );
+
+    return () => {
+      genRef.current += 1; // invalidate in-flight callbacks immediately
       unsubSettings();
       unsubCategories();
       unsubProducts();
@@ -286,12 +739,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubExpenses();
       unsubAdjustments();
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, currentBusinessId, authLoading]);
 
-  // Always save settings to LocalStorage for persistence across sessions/logouts
+  // Settings cache (works for guests and as a cache for authenticated users)
   useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_settings`, JSON.stringify(settings));
-  }, [settings]);
+    if (!currentBusinessId) return;
+    if (!user && (!guestHydrated || guestHydratedBizId !== currentBusinessId)) return;
+    localStorage.setItem(bizStorageKey(currentBusinessId, 'settings'), JSON.stringify(settings));
+  }, [settings, currentBusinessId, user, guestHydrated, guestHydratedBizId]);
 
   // Apply custom primary theme color and background color
   useEffect(() => {
@@ -348,67 +804,127 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [settings.primaryColor, settings.backgroundColor]);
 
-  useEffect(() => {
-    if (user) return;
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_categories`, JSON.stringify(categories));
-  }, [categories, user]);
-
-  useEffect(() => {
-    if (user) return;
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_products`, JSON.stringify(products));
-  }, [products, user]);
-
-  useEffect(() => {
-    if (user) return;
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_batches`, JSON.stringify(batches));
-  }, [batches, user]);
-
-  useEffect(() => {
-    if (user) return;
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_sales`, JSON.stringify(sales));
-  }, [sales, user]);
-
-  useEffect(() => {
-    if (user) return;
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_expenses`, JSON.stringify(operatingExpenses));
-  }, [operatingExpenses, user]);
-
-  useEffect(() => {
-    if (user) return;
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_adjustments`, JSON.stringify(adjustments));
-  }, [adjustments, user]);
-
-  // Helper to remove undefined properties before sending to Firestore
-  const safeSetDoc = (docRef: any, data: any) => {
-    const cleanForFirestore = (obj: any): any => {
-      if (obj === null || obj === undefined) return null;
-      if (Array.isArray(obj)) {
-        return obj.map((item) => cleanForFirestore(item));
-      }
-      if (typeof obj === 'object') {
-        const cleaned: Record<string, any> = {};
-        for (const key of Object.keys(obj)) {
-          if (obj[key] !== undefined) {
-            cleaned[key] = cleanForFirestore(obj[key]);
-          }
-        }
-        return cleaned;
-      }
-      return obj;
-    };
-    return setDoc(docRef, cleanForFirestore(data)).catch((err) =>
-      console.error('Firestore setDoc error:', err)
-    );
+  // ---------- Guest persistence (namespaced by businessId) ----------
+  const persistGuest = (suffix: string, value: unknown) => {
+    if (user || !guestHydrated || !currentBusinessId) return;
+    // Only persist once the in-memory state actually belongs to the active business
+    if (guestHydratedBizId !== currentBusinessId) return;
+    try {
+      localStorage.setItem(bizStorageKey(currentBusinessId, suffix), JSON.stringify(value));
+    } catch (e) {
+      console.error('Error persisting guest data', suffix, e);
+    }
   };
 
-  // Actions
-  const updateSettings = (newSettings: Partial<AppSettings>) => {
-    const updated = { ...settings, ...newSettings };
-    setSettings(updated);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_settings`, JSON.stringify(updated));
+  useEffect(() => {
+    persistGuest('categories', categories);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, user, guestHydrated, guestHydratedBizId, currentBusinessId]);
+
+  useEffect(() => {
+    persistGuest('products', products);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, user, guestHydrated, guestHydratedBizId, currentBusinessId]);
+
+  useEffect(() => {
+    persistGuest('batches', batches);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batches, user, guestHydrated, guestHydratedBizId, currentBusinessId]);
+
+  useEffect(() => {
+    persistGuest('sales', sales);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales, user, guestHydrated, guestHydratedBizId, currentBusinessId]);
+
+  useEffect(() => {
+    persistGuest('expenses', operatingExpenses);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operatingExpenses, user, guestHydrated, guestHydratedBizId, currentBusinessId]);
+
+  useEffect(() => {
+    persistGuest('adjustments', adjustments);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adjustments, user, guestHydrated, guestHydratedBizId, currentBusinessId]);
+
+  // ---------- Business actions ----------
+  const createBusiness = async (nombre: string): Promise<Business> => {
+    const trimmed = nombre.trim() || 'Mi Negocio';
+    const id = `b-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const business: Business = {
+      id,
+      nombre: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+
     if (user) {
-      safeSetDoc(doc(db, 'users', user.uid, 'settings', 'config'), updated);
+      const now = new Date().toISOString();
+
+      // 1) Optimistic updates BEFORE any await: without them the resolver effect
+      //    could see a stale `businesses` list and revert profile.activeBusinessId
+      setBusinesses((prev) => (prev.some((b) => b.id === id) ? prev : [...prev, business]));
+      setProfile((prev) => ({
+        ...(prev ?? { createdAt: now }),
+        activeBusinessId: id,
+        updatedAt: now,
+      }));
+
+      // 2) If onboarding is stuck (businessLoading && no active business) switch
+      //    right away so the UI is not blocked waiting for the migration
+      if (businessLoading && currentBusinessId === null) {
+        setCurrentBusinessId(id);
+      }
+
+      // 3) Persist business + profile
+      await safeSetDoc(
+        doc(db, 'users', user.uid, 'businesses', id),
+        business as unknown as DocumentData
+      );
+      const pRef = profileDocRef();
+      if (pRef) await safeSetDoc(pRef, { activeBusinessId: id, updatedAt: now }, { merge: true });
+
+      // 4) Activate it (no-op if step 2 already did it)
+      setCurrentBusinessId(id);
+    } else {
+      const list = [...businesses, business];
+      setBusinesses(list);
+      localStorage.setItem(GUEST_BUSINESSES_KEY, JSON.stringify(list));
+      // New guest businesses are born EMPTY (no seed/demo lists)
+      initEmptyBizStorage(id);
+      localStorage.setItem(GUEST_ACTIVE_KEY, id);
+      setCurrentBusinessId(id);
     }
+
+    return business;
+  };
+
+  const switchBusiness = async (id: string) => {
+    if (id === currentBusinessId) return;
+    if (!businesses.some((b) => b.id === id)) return;
+
+    if (user) {
+      const now = new Date().toISOString();
+      // Persist first, then move the UI: avoids out-of-order writes / resolver races
+      const pRef = profileDocRef();
+      if (pRef) await safeSetDoc(pRef, { activeBusinessId: id, updatedAt: now }, { merge: true });
+      setProfile((prev) => ({
+        ...(prev ?? { createdAt: now }),
+        activeBusinessId: id,
+        updatedAt: now,
+      }));
+      setCurrentBusinessId(id);
+    } else {
+      localStorage.setItem(GUEST_ACTIVE_KEY, id);
+      setCurrentBusinessId(id);
+    }
+  };
+
+  // ---------- Data actions ----------
+  const updateSettings = (newSettings: Partial<AppSettings>) => {
+    // Functional update: concurrent updates can't clobber each other
+    setSettings((prev) => ({ ...prev, ...newSettings }));
+    const ref = bizDoc('settings', 'config');
+    // merge:true so we never wipe fields not included in this patch
+    if (ref) safeSetDoc(ref, newSettings, { merge: true });
   };
 
   const addCategory = (nombre: string): Category => {
@@ -419,9 +935,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
     setCategories((prev) => [...prev, newCategory]);
-    if (user) {
-      safeSetDoc(doc(db, 'users', user.uid, 'categories', newCategory.id), newCategory);
-    }
+    const ref = bizDoc('categories', newCategory.id);
+    if (ref) safeSetDoc(ref, newCategory);
     return newCategory;
   };
 
@@ -435,9 +950,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
     setProducts((prev) => [...prev, newProduct]);
-    if (user) {
-      safeSetDoc(doc(db, 'users', user.uid, 'products', newProduct.id), newProduct);
-    }
+    const ref = bizDoc('products', newProduct.id);
+    if (ref) safeSetDoc(ref, newProduct);
     return newProduct;
   };
 
@@ -446,9 +960,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!existing) return;
     const updated = { ...existing, ...productData };
     setProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
-    if (user) {
-      safeSetDoc(doc(db, 'users', user.uid, 'products', id), updated);
-    }
+    const ref = bizDoc('products', id);
+    if (ref) safeSetDoc(ref, updated);
   };
 
   const archiveProduct = (id: string) => {
@@ -456,9 +969,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!existing) return;
     const updated = { ...existing, archivado: !existing.archivado };
     setProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
-    if (user) {
-      safeSetDoc(doc(db, 'users', user.uid, 'products', id), updated);
-    }
+    const ref = bizDoc('products', id);
+    if (ref) safeSetDoc(ref, updated);
   };
 
   const deleteProduct = (id: string) => {
@@ -474,9 +986,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setProducts((prev) => prev.filter((p) => p.id !== id));
-    if (user) {
-      deleteDoc(doc(db, 'users', user.uid, 'products', id));
-    }
+    const ref = bizDoc('products', id);
+    if (ref) deleteDoc(ref);
     return { success: true, message: 'Producto eliminado correctamente.' };
   };
 
@@ -515,9 +1026,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setBatches((prev) => [newBatch, ...prev]);
-    if (user) {
-      setDoc(doc(db, 'users', user.uid, 'batches', newBatch.id), newBatch);
-    }
+    const ref = bizDoc('batches', newBatch.id);
+    if (ref) safeSetDoc(ref, newBatch);
     return newBatch;
   };
 
@@ -526,9 +1036,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!existing) return;
     const updated = { ...existing, notas };
     setBatches((prev) => prev.map((b) => (b.id === id ? updated : b)));
-    if (user) {
-      setDoc(doc(db, 'users', user.uid, 'batches', id), updated);
-    }
+    const ref = bizDoc('batches', id);
+    if (ref) safeSetDoc(ref, updated);
   };
 
   const updatePurchaseBatch = (
@@ -577,9 +1086,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setBatches((prev) => prev.map((b) => (b.id === id ? updated : b)));
-    if (user) {
-      setDoc(doc(db, 'users', user.uid, 'batches', id), updated);
-    }
+    const ref = bizDoc('batches', id);
+    if (ref) safeSetDoc(ref, updated);
   };
 
   const deletePurchaseBatch = (id: string): { success: boolean; message: string } => {
@@ -597,9 +1105,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setBatches((prev) => prev.filter((b) => b.id !== id));
-    if (user) {
-      deleteDoc(doc(db, 'users', user.uid, 'batches', id));
-    }
+    const ref = bizDoc('batches', id);
+    if (ref) deleteDoc(ref);
     return { success: true, message: 'Lote de compra eliminado correctamente.' };
   };
 
@@ -687,15 +1194,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBatches(updatedBatches);
     setSales((prev) => [newSale, ...prev]);
 
-    if (user) {
-      setDoc(doc(db, 'users', user.uid, 'sales', newSale.id), newSale);
-      allocations.forEach((alloc) => {
-        const b = updatedBatches.find((x) => x.id === alloc.loteId);
-        if (b) {
-          setDoc(doc(db, 'users', user.uid, 'batches', b.id), b);
-        }
-      });
-    }
+    const saleRef = bizDoc('sales', newSale.id);
+    if (saleRef) safeSetDoc(saleRef, newSale);
+    allocations.forEach((alloc) => {
+      const b = updatedBatches.find((x) => x.id === alloc.loteId);
+      if (b) {
+        const batchRef = bizDoc('batches', b.id);
+        if (batchRef) safeSetDoc(batchRef, b);
+      }
+    });
 
     return {
       success: true,
@@ -730,15 +1237,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBatches(updatedBatches);
     setSales((prev) => prev.map((s) => (s.id === saleId ? updatedSale : s)));
 
-    if (user) {
-      setDoc(doc(db, 'users', user.uid, 'sales', saleId), updatedSale);
-      sale.asignacionesLotes.forEach((alloc) => {
-        const b = updatedBatches.find((x) => x.id === alloc.loteId);
-        if (b) {
-          setDoc(doc(db, 'users', user.uid, 'batches', b.id), b);
-        }
-      });
-    }
+    const saleRef = bizDoc('sales', saleId);
+    if (saleRef) safeSetDoc(saleRef, updatedSale);
+    sale.asignacionesLotes.forEach((alloc) => {
+      const b = updatedBatches.find((x) => x.id === alloc.loteId);
+      if (b) {
+        const batchRef = bizDoc('batches', b.id);
+        if (batchRef) safeSetDoc(batchRef, b);
+      }
+    });
 
     return { success: true, message: 'Venta cancelada y stock restaurado con éxito.' };
   };
@@ -747,24 +1254,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const sale = sales.find((s) => s.id === saleId);
     if (!sale) return;
     const updatedSale: Sale = { ...sale, fecha: newFecha };
-    const newSales = sales.map((s) => (s.id === saleId ? updatedSale : s));
-    setSales(newSales);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_sales`, JSON.stringify(newSales));
-    if (user) {
-      safeSetDoc(doc(db, 'users', user.uid, 'sales', saleId), updatedSale);
-    }
+    setSales((prev) => prev.map((s) => (s.id === saleId ? updatedSale : s)));
+    const ref = bizDoc('sales', saleId);
+    if (ref) safeSetDoc(ref, updatedSale);
   };
 
   const updateBatchDate = (batchId: string, newFecha: string) => {
     const batch = batches.find((b) => b.id === batchId);
     if (!batch) return;
     const updatedBatch: PurchaseBatch = { ...batch, fecha: newFecha };
-    const newBatches = batches.map((b) => (b.id === batchId ? updatedBatch : b));
-    setBatches(newBatches);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_batches`, JSON.stringify(newBatches));
-    if (user) {
-      safeSetDoc(doc(db, 'users', user.uid, 'batches', batchId), updatedBatch);
-    }
+    setBatches((prev) => prev.map((b) => (b.id === batchId ? updatedBatch : b)));
+    const ref = bizDoc('batches', batchId);
+    if (ref) safeSetDoc(ref, updatedBatch);
   };
 
   const addOperatingExpense = (expenseData: {
@@ -782,9 +1283,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setOperatingExpenses((prev) => [newExpense, ...prev]);
-    if (user) {
-      setDoc(doc(db, 'users', user.uid, 'expenses', newExpense.id), newExpense);
-    }
+    const ref = bizDoc('expenses', newExpense.id);
+    if (ref) safeSetDoc(ref, newExpense);
     return newExpense;
   };
 
@@ -827,10 +1327,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBatches((prev) => prev.map((b) => (b.id === batch.id ? updatedBatch : b)));
     setAdjustments((prev) => [newAdjustment, ...prev]);
 
-    if (user) {
-      setDoc(doc(db, 'users', user.uid, 'adjustments', newAdjustment.id), newAdjustment);
-      setDoc(doc(db, 'users', user.uid, 'batches', batch.id), updatedBatch);
-    }
+    const adjRef = bizDoc('adjustments', newAdjustment.id);
+    if (adjRef) safeSetDoc(adjRef, newAdjustment);
+    const batchRef = bizDoc('batches', batch.id);
+    if (batchRef) safeSetDoc(batchRef, updatedBatch);
 
     return { success: true, message: 'Ajuste de inventario registrado correctamente.' };
   };
@@ -842,23 +1342,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOperatingExpenses([]);
     setAdjustments([]);
 
-    if (user) {
-      const uid = user.uid;
+    if (bizCol('products')) {
       const collectionsToClear = ['products', 'batches', 'sales', 'expenses', 'adjustments'];
       for (const colName of collectionsToClear) {
-        const snap = await getDocs(collection(db, 'users', uid, colName));
+        const colRef = bizCol(colName);
+        if (!colRef) continue;
+        const snap = await getDocs(colRef);
         if (!snap.empty) {
           const b = writeBatch(db);
           snap.forEach((d) => b.delete(d.ref));
           await b.commit();
         }
       }
-    } else {
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_products`);
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_batches`);
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_sales`);
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_expenses`);
-      localStorage.removeItem(`${LOCAL_STORAGE_KEY}_adjustments`);
+    } else if (currentBusinessId) {
+      (['products', 'batches', 'sales', 'expenses', 'adjustments'] as const).forEach((suffix) => {
+        localStorage.removeItem(bizStorageKey(currentBusinessId, suffix));
+      });
     }
   };
 
@@ -871,19 +1370,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOperatingExpenses(initialOperatingExpenses);
     setAdjustments([]);
 
-    if (user) {
-      const uid = user.uid;
-      setDoc(doc(db, 'users', uid, 'settings', 'config'), initialSettings);
+    if (user && currentBusinessId) {
+      const cfgRef = bizDoc('settings', 'config');
+      if (cfgRef) safeSetDoc(cfgRef, initialSettings);
 
       const b = writeBatch(db);
-      initialCategories.forEach((c) => b.set(doc(db, 'users', uid, 'categories', c.id), c));
-      initialProducts.forEach((p) => b.set(doc(db, 'users', uid, 'products', p.id), p));
-      initialBatches.forEach((bt) => b.set(doc(db, 'users', uid, 'batches', bt.id), bt));
-      initialSales.forEach((s) => b.set(doc(db, 'users', uid, 'sales', s.id), s));
-      initialOperatingExpenses.forEach((e) => b.set(doc(db, 'users', uid, 'expenses', e.id), e));
-      b.commit();
-    } else {
-      localStorage.clear();
+      const put = (colName: string, id: string, data: unknown) => {
+        const ref = bizDoc(colName, id);
+        if (ref) b.set(ref, data as unknown as DocumentData);
+      };
+      initialCategories.forEach((c) => put('categories', c.id, c));
+      initialProducts.forEach((p) => put('products', p.id, p));
+      initialBatches.forEach((bt) => put('batches', bt.id, bt));
+      initialSales.forEach((s) => put('sales', s.id, s));
+      initialOperatingExpenses.forEach((e) => put('expenses', e.id, e));
+      b.commit().catch((err) => console.error('Firestore batch error:', err));
+    } else if (currentBusinessId) {
+      DATA_SUFFIXES.forEach((suffix) => {
+        localStorage.removeItem(bizStorageKey(currentBusinessId, suffix));
+      });
+      // Persist effects will write the seed state back right away
+      localStorage.setItem(
+        bizStorageKey(currentBusinessId, 'settings'),
+        JSON.stringify(initialSettings)
+      );
     }
   };
 
@@ -897,6 +1407,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sales,
         operatingExpenses,
         adjustments,
+        businesses,
+        currentBusinessId,
+        businessLoading,
+        createBusiness,
+        switchBusiness,
         updateSettings,
         addCategory,
         addProduct,
