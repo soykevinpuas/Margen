@@ -33,6 +33,18 @@ export const VenderView: React.FC<VenderViewProps> = ({
   const [unitPrice, setUnitPrice] = useState<string>('');
   const [expenses, setExpenses] = useState<SaleExpenseItem[]>([]);
   const [notes, setNotes] = useState<string>('');
+  const [selectedLotIds, setSelectedLotIds] = useState<string[] | null>(null);
+  const [allocationModalOpen, setAllocationModalOpen] = useState(false);
+
+  const productBatches = selectedProduct
+    ? batches
+        .filter((b) => b.productoId === selectedProduct.id && b.cantidadDisponible > 0)
+        .sort((a, b) => {
+          if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+          if (a.createdAt !== b.createdAt) return a.createdAt.localeCompare(b.createdAt);
+          return a.id.localeCompare(b.id);
+        })
+    : [];
 
   // Sales history tab filters
   const [salesSearch, setSalesSearch] = useState('');
@@ -79,6 +91,15 @@ export const VenderView: React.FC<VenderViewProps> = ({
     setUnitPrice(p.precioSugerido != null ? String(p.precioSugerido) : '');
     setExpenses([]);
     setIsProductSheetOpen(false);
+    setSelectedLotIds(null);
+    const active = batches.filter(
+      (b) => b.productoId === p.id && b.cantidadDisponible > 0
+    );
+    if (active.length > 1) {
+      const firstId = active.sort((a,b) => a.fecha === b.fecha ? a.id.localeCompare(b.id) : a.fecha.localeCompare(b.fecha))[0]?.id;
+      setSelectedLotIds(firstId ? [firstId] : null);
+      setAllocationModalOpen(true);
+    }
   };
 
   const handleClearProduct = () => {
@@ -86,6 +107,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
     setQuantity(1);
     setUnitPrice('');
     setExpenses([]);
+    setSelectedLotIds(null);
   };
 
   const availableStock = selectedProduct
@@ -137,22 +159,76 @@ export const VenderView: React.FC<VenderViewProps> = ({
     ? calculateFifoAllocation(selectedProduct.id, numericQty, batches)
     : { cogsMXN: 0 };
 
+  const customAllocation =
+    selectedProduct && selectedLotIds && selectedLotIds.length > 0
+      ? buildCustomAllocations()
+      : null;
+  const effectiveCostMXN =
+    customAllocation && customAllocation.allocated === numericQty
+      ? customAllocation.cogsMXN
+      : fifoCalc.cogsMXN;
+
   const totalSaleExpenses = expenses.reduce((acc, e) => acc + (e.montoMXN || 0), 0);
-  const totalCost = fifoCalc.cogsMXN + totalSaleExpenses;
+  const totalCost = effectiveCostMXN + totalSaleExpenses;
   const profit = totalRevenue - totalCost;
   const marginPct = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+
+  function buildCustomAllocations() {
+    if (!selectedLotIds || selectedLotIds.length === 0 || !selectedProduct) {
+      return null;
+    }
+    const chosen = batches
+      .filter(
+        (b) =>
+          b.productoId === selectedProduct.id &&
+          selectedLotIds.includes(b.id) &&
+          b.cantidadDisponible > 0
+      )
+      .sort((a, b) =>
+        a.fecha === b.fecha
+          ? a.id.localeCompare(b.id)
+          : a.fecha.localeCompare(b.fecha)
+      );
+    let remaining = numericQty;
+    const allocations: {
+      loteId: string;
+      cantidadTomada: number;
+      costoUnitarioLoteSnapshotMXN: number;
+    }[] = [];
+    for (const b of chosen) {
+      if (remaining <= 0) break;
+      const take = Math.min(b.cantidadDisponible, remaining);
+      allocations.push({
+        loteId: b.id,
+        cantidadTomada: take,
+        costoUnitarioLoteSnapshotMXN: b.costoUnitarioRealMXN,
+      });
+      remaining -= take;
+    }
+    const allocated = allocations.reduce((a, x) => a + x.cantidadTomada, 0);
+    const cogsMXN = allocations.reduce(
+      (s, a) => s + a.cantidadTomada * a.costoUnitarioLoteSnapshotMXN,
+      0
+    );
+    return { allocations, allocated, cogsMXN };
+  };
 
   // Confirm Sale
   const handleConfirmSale = () => {
     if (!selectedProduct) return;
     if (numericQty <= 0) return;
 
+    const custom = buildCustomAllocations();
+    const canUseCustom = custom && custom.allocated === numericQty;
+    const allocations = canUseCustom ? custom!.allocations : undefined;
+
     const res = addSale({
       productoId: selectedProduct.id,
       cantidad: numericQty,
       precioVentaUnitarioMXN: numericPrice,
       gastosDeVenta: expenses.filter((e) => e.montoMXN > 0),
-      metodoAsignacion: 'FIFO',
+      metodoAsignacion: allocations ? 'MANUAL' : 'FIFO',
+      customAllocations: allocations,
       fecha: new Date().toISOString(),
       notas: notes,
     });
@@ -477,6 +553,24 @@ export const VenderView: React.FC<VenderViewProps> = ({
               </div>
             </div>
           </section>
+
+          {/* LOT SELECTOR SUMMARY */}
+          {selectedProduct && productBatches.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setAllocationModalOpen(true)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-dashed border-outline-variant text-xs text-on-surface-variant hover:border-primary/60 hover:text-on-surface transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">layers</span>
+                Lote(s) seleccionados:{' '}
+                <span className="font-bold text-on-surface">
+                  {selectedLotIds ? selectedLotIds.join(', ') : 'FIFO automático'}
+                </span>
+              </span>
+              <span className="text-primary font-bold">Cambiar</span>
+            </button>
+          )}
 
           {/* STEP 3: SALE EXPENSES */}
           <section
@@ -960,6 +1054,97 @@ export const VenderView: React.FC<VenderViewProps> = ({
                   );
                 })
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* BATCH / LOTE SELECTION SHEET MODAL */}
+      {allocationModalOpen && productBatches.length > 0 && (
+        <>
+          <div
+            onClick={() => setAllocationModalOpen(false)}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]"
+          ></div>
+          <div className="fixed bottom-0 left-0 w-full h-[60vh] bg-surface-container-high rounded-t-2xl z-[70] flex flex-col border-t border-outline-variant shadow-2xl animate-fade-in">
+            <div className="flex justify-center p-3">
+              <div className="w-12 h-1.5 bg-outline rounded-full"></div>
+            </div>
+
+            <div className="px-4 pb-3 border-b border-outline-variant">
+              <h3 className="text-sm font-headline font-bold text-on-surface">
+                Selecciona el lote a usar
+              </h3>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                Por defecto viene seleccionado el lote más viejo (FIFO). Puedes elegir uno o varios.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {productBatches.map((b) => {
+                const checked = selectedLotIds?.includes(b.id);
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedLotIds((prev) => {
+                        const list = prev || [];
+                        return list.includes(b.id)
+                          ? list.filter((id) => id !== b.id)
+                          : [...list, b.id];
+                      });
+                    }}
+                    className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border transition-all text-left ${
+                      checked
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                        : 'border-outline-variant/30 hover:bg-surface-container'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`w-5 h-5 rounded-md border flex items-center justify-center ${checked ? 'bg-primary border-primary text-on-primary' : 'border-outline-variant'}`}>
+                        {checked && (
+                          <span className="material-symbols-outlined text-[14px]">
+                            check
+                          </span>
+                        )}
+                      </span>
+                      <div>
+                        <div className="text-on-surface font-bold text-xs font-mono">
+                          Lote {b.id}
+                        </div>
+                        <div className="text-on-surface-variant text-[10px]">
+                          {b.fecha ? new Date(b.fecha).toLocaleDateString('es-MX') : ''} · {b.cantidadDisponible} u. disp.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-on-surface text-xs font-bold">
+                        {formatMoney(b.costoUnitarioRealMXN || 0, displayCurrency, exchangeRate)}
+                      </div>
+                      <div className="text-[10px] text-on-surface-variant">c/u</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="p-4 border-t border-outline-variant flex gap-2">
+              <button
+                onClick={() => setAllocationModalOpen(false)}
+                className="flex-1 py-2.5 bg-primary text-on-primary font-bold text-xs rounded-xl shadow-sm"
+              >
+                Confirmar selección
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedLotIds(null);
+                  setAllocationModalOpen(false);
+                }}
+                className="flex-1 py-2.5 bg-surface-container border border-outline-variant text-on-surface font-bold text-xs rounded-xl"
+              >
+                Usar FIFO automático
+              </button>
             </div>
           </div>
         </>
