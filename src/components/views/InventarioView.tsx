@@ -766,32 +766,48 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                         className="bg-surface-container border border-outline-variant rounded-xl p-3.5 space-y-1.5"
                       >
                         <div className="flex justify-between items-start gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-on-surface text-xs">
-                                Venta {s.id}
-                              </span>
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                                  s.estado === 'cancelada'
-                                    ? 'bg-error/20 text-error'
-                                    : 'bg-tertiary/20 text-tertiary'
-                                }`}
-                              >
-                                {s.estado}
-                              </span>
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-surface border border-outline-variant flex-shrink-0 flex items-center justify-center overflow-hidden">
+                              {prod?.imagen ? (
+                                <img
+                                  src={prod.imagen}
+                                  alt={prod.nombre}
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
+                                  inventory_2
+                                </span>
+                              )}
                             </div>
-                            <h4 className="font-bold text-on-surface text-xs mt-0.5 truncate">
-                              {prod ? prod.nombre : 'Producto no encontrado'}
-                            </h4>
-                            <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">
-                              {s.fecha ? new Date(s.fecha).toLocaleDateString('es-MX') : ''} • {s.cantidad} u. • {s.metodoAsignacion}
-                            </p>
-                            {s.notas && (
-                              <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
-                                {s.notas}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-on-surface text-xs">
+                                  Venta {s.id}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                    s.estado === 'cancelada'
+                                      ? 'bg-error/20 text-error'
+                                      : 'bg-tertiary/20 text-tertiary'
+                                  }`}
+                                >
+                                  {s.estado}
+                                </span>
+                              </div>
+                              <h4 className="font-bold text-on-surface text-xs mt-0.5 truncate">
+                                {prod ? prod.nombre : 'Producto no encontrado'}
+                              </h4>
+                              <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">
+                                {s.fecha ? new Date(s.fecha).toLocaleDateString('es-MX') : ''} • {s.cantidad} u. • {s.metodoAsignacion === 'MANUAL' ? 'Lote seleccionado' : 'Lote más antiguo'}
                               </p>
-                            )}
+                              {s.notas && (
+                                <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                                  {s.notas}
+                                </p>
+                              )}
+                            </div>
                           </div>
                           <div className="text-right">
                             <div className="text-xs font-bold text-on-surface">

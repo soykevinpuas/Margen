@@ -300,7 +300,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
         lines={[
           { label: info.productName, text: `${info.quantity} und.` },
           { label: 'Precio unitario', amount: info.unitPrice },
-          { label: `Costo mercancía (${info.metodo || 'FIFO'})`, amount: info.costMXN },
+          { label: `Costo mercancía (${info.metodo === 'MANUAL' ? 'lote seleccionado' : 'lote más antiguo'})`, amount: info.costMXN },
           ...(info.expensesTotalMXN > 0 ? [{ label: 'Gastos de venta', amount: info.expensesTotalMXN }] : []),
         ]}
         totalLabel="Ingreso Cobrado"
@@ -312,7 +312,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
           },
           { label: 'Margen', value: `${info.marginPct.toFixed(1)}%` },
           { label: 'Stock restante', value: `${info.remainingStock} und.` },
-          { label: 'Método', value: info.metodo },
+          { label: 'Método', value: info.metodo === 'MANUAL' ? 'Lote seleccionado' : 'Lote más antiguo' },
         ]}
         notas={info.notas}
         onSecondary={() => {
@@ -565,7 +565,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
                 <span className="material-symbols-outlined text-[16px]">layers</span>
                 Lote(s) seleccionados:{' '}
                 <span className="font-bold text-on-surface">
-                  {selectedLotIds ? selectedLotIds.join(', ') : 'FIFO automático'}
+                  {selectedLotIds ? selectedLotIds.join(', ') : 'Lote más antiguo (auto)'}
                 </span>
               </span>
               <span className="text-primary font-bold">Cambiar</span>
@@ -1076,7 +1076,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
                 Selecciona el lote a usar
               </h3>
               <p className="text-[11px] text-on-surface-variant mt-0.5">
-                Por defecto viene seleccionado el lote más viejo (FIFO). Puedes elegir uno o varios.
+                Por defecto viene seleccionado el lote más viejo. Puedes elegir uno o varios.
               </p>
             </div>
 
@@ -1143,7 +1143,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
                 }}
                 className="flex-1 py-2.5 bg-surface-container border border-outline-variant text-on-surface font-bold text-xs rounded-xl"
               >
-                Usar FIFO automático
+                Usar lote antiguo automático
               </button>
             </div>
           </div>
