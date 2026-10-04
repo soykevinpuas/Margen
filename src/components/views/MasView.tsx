@@ -16,6 +16,7 @@ interface MasViewProps {
   onOpenLanding?: () => void;
   onOpenGastoHistorico?: () => void;
   onOpenGananciasHistoricas?: () => void;
+  onOpenGraficas?: () => void;
 }
 
 export const MasView: React.FC<MasViewProps> = ({
@@ -29,6 +30,7 @@ export const MasView: React.FC<MasViewProps> = ({
   onOpenLanding,
   onOpenGastoHistorico,
   onOpenGananciasHistoricas,
+  onOpenGraficas,
 }) => {
   const { settings } = useApp();
   const [isExcelOpen, setIsExcelOpen] = useState(false);
@@ -117,6 +119,28 @@ export const MasView: React.FC<MasViewProps> = ({
               chevron_right
             </span>
           </button>
+
+          {onOpenGraficas && (
+            <button
+              onClick={onOpenGraficas}
+              className="w-full p-3.5 flex items-center justify-between hover:bg-surface-container-high transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-tertiary/10 border border-tertiary/20 flex items-center justify-center text-tertiary">
+                  <span className="material-symbols-outlined text-lg">monitoring</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-on-surface">Gráficas & Reportes</span>
+                  <span className="text-[10px] text-on-surface-variant">
+                    Desempeño de ventas y ganancias
+                  </span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-on-surface-variant text-lg">
+                chevron_right
+              </span>
+            </button>
+          )}
         </div>
       </section>
 

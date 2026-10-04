@@ -45,10 +45,10 @@ export const AppContent: React.FC = () => {
   const tabTitles: Record<TabType, string> = {
     inicio: 'Inicio',
     inventario: 'Inventario',
-    vender: 'Vender',
-    graficas: 'Gráficas & Reportes',
     mas: 'Más Opciones',
   };
+
+  const [overlayView, setOverlayView] = useState<'vender' | 'graficas' | null>(null);
 
   const handleSelectProduct = (productId: string) => {
     setSelectedProductId(productId);
@@ -125,16 +125,18 @@ export const AppContent: React.FC = () => {
 
         {/* Main View Area */}
         <main className="flex-1 pb-6">
-          {activeTab === 'inicio' && (
+          {overlayView === null && activeTab === 'inicio' && (
             <InicioView
               onNavigateTab={(tab) => setActiveTab(tab)}
+              onOpenVender={() => setOverlayView('vender')}
+              onOpenGraficas={() => setOverlayView('graficas')}
               onOpenCompra={() => setIsCompraOpen(true)}
               onOpenGasto={() => setIsGastoOpen(true)}
               onSelectProduct={handleSelectProduct}
             />
           )}
 
-          {activeTab === 'inventario' && (
+          {overlayView === null && activeTab === 'inventario' && (
             <InventarioView
               onSelectProduct={handleSelectProduct}
               onOpenNuevoProducto={() => {
@@ -145,25 +147,49 @@ export const AppContent: React.FC = () => {
             />
           )}
 
-          {activeTab === 'vender' && (
-            <VenderView
-              preselectedProductId={preselectedProductForSale}
-              onSaleSuccess={() => {
-                setPreselectedProductForSale(null);
-              }}
-              onGoToHistory={() => {
-                setIsHistorialVentasOpen(true);
-              }}
-              onOpenNuevoProducto={() => {
-                setEditingProductId(null);
-                setIsNuevoProductoOpen(true);
-              }}
-            />
+          {overlayView === 'vender' && (
+            <div className="flex flex-col">
+              <div className="p-2">
+                <button
+                  onClick={() => setOverlayView(null)}
+                  className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface"
+                >
+                  <span className="material-symbols-outlined">arrow_back</span>
+                  Volver
+                </button>
+              </div>
+              <VenderView
+                preselectedProductId={preselectedProductForSale}
+                onSaleSuccess={() => {
+                  setPreselectedProductForSale(null);
+                }}
+                onGoToHistory={() => {
+                  setIsHistorialVentasOpen(true);
+                }}
+                onOpenNuevoProducto={() => {
+                  setEditingProductId(null);
+                  setIsNuevoProductoOpen(true);
+                }}
+              />
+            </div>
           )}
 
-          {activeTab === 'graficas' && <GraficasView />}
+          {overlayView === 'graficas' && (
+            <div className="flex flex-col">
+              <div className="p-2">
+                <button
+                  onClick={() => setOverlayView(null)}
+                  className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface"
+                >
+                  <span className="material-symbols-outlined">arrow_back</span>
+                  Volver
+                </button>
+              </div>
+              <GraficasView />
+            </div>
+          )}
 
-          {activeTab === 'mas' && (
+          {overlayView === null && activeTab === 'mas' && (
             <MasView
               onOpenCompra={() => setIsCompraOpen(true)}
               onOpenGasto={() => setIsGastoOpen(true)}
@@ -172,6 +198,7 @@ export const AppContent: React.FC = () => {
               onOpenGastosOperativos={() => setIsGastosOperativosOpen(true)}
               onOpenAjusteInventario={() => setIsAjusteInventarioOpen(true)}
               onOpenConfiguracion={() => setIsConfiguracionOpen(true)}
+              onOpenGraficas={() => setOverlayView('graficas')}
             />
           )}
         </main>

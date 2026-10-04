@@ -10,7 +10,9 @@ import { ChartRenderer, ChartDataPoint } from '../ChartRenderer';
 import { CalendarioMesModal } from '../modals/CalendarioMesModal';
 
 interface InicioViewProps {
-  onNavigateTab: (tab: 'vender' | 'inventario' | 'graficas' | 'mas') => void;
+  onNavigateTab: (tab: 'inicio' | 'inventario' | 'mas') => void;
+  onOpenVender: () => void;
+  onOpenGraficas: () => void;
   onOpenCompra: () => void;
   onOpenGasto: () => void;
   onSelectProduct: (productId: string) => void;
@@ -18,6 +20,8 @@ interface InicioViewProps {
 
 export const InicioView: React.FC<InicioViewProps> = ({
   onNavigateTab,
+  onOpenVender,
+  onOpenGraficas,
   onOpenCompra,
   onOpenGasto,
   onSelectProduct,
@@ -344,7 +348,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
         {/* Ventas Registradas (Opens Sales History on Vender tab) */}
         <div
-          onClick={() => onNavigateTab('vender')}
+          onClick={() => onOpenVender()}
           className="bg-surface-container rounded-xl p-4 border border-outline-variant flex flex-col justify-between relative group cursor-pointer hover:border-tertiary/50 transition-all shadow-sm"
         >
           <div>
@@ -469,7 +473,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
         <div className="grid grid-cols-3 gap-3">
           {/* Vender */}
           <button
-            onClick={() => onNavigateTab('vender')}
+            onClick={() => onOpenVender()}
             className="bg-primary hover:bg-primary-container text-on-primary rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-primary/20"
           >
             <span
