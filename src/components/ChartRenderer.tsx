@@ -74,9 +74,14 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
           </div>
         )}
 
-        {/* 1. BARRAS */}
+        {/* 1. BARRAS (scroll horizontal en el eje X cuando no caben todos los días) */}
         {chartType === 'barras' && (
-          <div className="w-full h-full flex items-end justify-between gap-1 z-10">
+          <div
+            className="w-full h-full z-10 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+            role="region"
+            aria-label="Barras: desliza horizontalmente para recorrer los días"
+          >
+            <div className="h-full w-full flex items-end gap-1 px-1">
             {data.map((pt, idx) => {
               const isToday = pt.label.startsWith('Hoy');
               const hasActivity = pt.ingresos > 0 || pt.gastos > 0 || pt.gananciaReal !== 0;
@@ -91,7 +96,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
                 <div
                   key={idx}
                   onClick={() => onSelectPoint?.(isSelected ? null : idx)}
-                  className={`flex-1 flex flex-col items-center justify-end h-full group cursor-pointer transition-all rounded-lg p-0.5 ${
+                  className={`flex-1 min-w-[52px] shrink-0 flex flex-col items-center justify-end h-full group cursor-pointer transition-all rounded-lg p-0.5 ${
                     isSelected
                       ? 'bg-primary/20 ring-1 ring-primary shadow-sm'
                       : isToday
@@ -104,21 +109,21 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
                     {/* Ingreso Bar (Violet) */}
                     <div
                       style={{ height: `${hIngreso}%` }}
-                      className={`w-1.5 sm:w-2.5 rounded-t-sm transition-all ${
+                      className={`w-2.5 rounded-t-sm transition-all ${
                         isSelected ? 'bg-violet-400 ring-1 ring-violet-200' : 'bg-violet-500 group-hover:bg-violet-400'
                       }`}
                     ></div>
                     {/* Gasto Bar (Rose) */}
                     <div
                       style={{ height: `${hGasto}%` }}
-                      className={`w-1.5 sm:w-2.5 rounded-t-sm transition-all ${
+                      className={`w-2.5 rounded-t-sm transition-all ${
                         isSelected ? 'bg-rose-400 ring-1 ring-rose-200' : 'bg-rose-500 group-hover:bg-rose-400'
                       }`}
                     ></div>
                     {/* Ganancia Real Bar (Emerald) */}
                     <div
                       style={{ height: `${hGanancia}%` }}
-                      className={`w-1.5 sm:w-2.5 rounded-t-sm transition-all ${
+                      className={`w-2.5 rounded-t-sm transition-all ${
                         isSelected
                           ? 'bg-emerald-300 ring-1 ring-emerald-100 shadow-md shadow-emerald-400/50'
                           : 'bg-emerald-500 group-hover:bg-emerald-400 shadow-sm shadow-emerald-500/30'
@@ -126,7 +131,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
                     ></div>
                   </div>
                   <span
-                    className={`text-[9px] font-bold mt-1 text-center truncate max-w-full leading-none transition-colors ${
+                    className={`text-[9px] font-bold mt-1 text-center whitespace-nowrap leading-none transition-colors ${
                       isSelected
                         ? 'text-primary font-extrabold'
                         : isToday
@@ -139,6 +144,7 @@ export const ChartRenderer: React.FC<ChartRendererProps> = ({
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 

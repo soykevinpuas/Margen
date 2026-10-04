@@ -68,6 +68,52 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
 
   const selectedStats = selectedDayKey ? getDayStats(selectedDayKey) : null;
 
+  // ===== Resumen del mes (siempre visible, no requiere seleccionar un día) =====
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const monthSales = confirmedSales.filter(
+    (s) => s.fecha && getLocalDateKey(s.fecha).startsWith(monthPrefix)
+  );
+  const monthExpenses = operatingExpenses.filter(
+    (e) => e.fecha && getLocalDateKey(e.fecha).startsWith(monthPrefix)
+  );
+
+  const monthIngresado = monthSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
+  const monthCogs = monthSales.reduce(
+    (acc, s) => acc + s.costoUnidadesVendidasMXN,
+    0
+  );
+  const monthGastosOperativos = monthExpenses.reduce((acc, e) => acc + e.montoMXN, 0);
+  const monthGastado = monthCogs + monthGastosOperativos;
+  const monthGanancia = monthIngresado - monthGastado;
+  const monthMargenPct = monthIngresado > 0 ? (monthGanancia / monthIngresado) * 100 : 0;
+
+  const monthDayStats = Array.from({ length: daysInMonth }).map((_, i) => {
+    const dateKey = getLocalDateKey(new Date(year, month, i + 1));
+    const stats = getDayStats(dateKey);
+    const hasActivity =
+      stats.ingresado > 0 || stats.gastado > 0 || stats.dayBatches.length > 0;
+    return { dayNum: i + 1, hasActivity, ...stats };
+  });
+
+  const diasActivos = monthDayStats.filter((d) => d.hasActivity).length;
+
+  // Mejor día = día con mayor ganancia neta entre los días con ventas
+  const bestDay = monthDayStats
+    .filter((d) => d.daySales.length > 0)
+    .reduce<{ dayNum: number; ganancia: number } | null>(
+      (best, d) => (best === null || d.ganancia > best.ganancia
+        ? { dayNum: d.dayNum, ganancia: d.ganancia }
+        : best),
+      null
+    );
+
+  const bestDayLabel = bestDay
+    ? new Date(year, month, bestDay.dayNum).toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'short',
+      })
+    : null;
+
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-fade-in">
       <div className="bg-surface-container-high border border-outline-variant w-full max-w-xl rounded-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
@@ -130,6 +176,101 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>Ganancia</span>
+          </div>
+        </div>
+
+        {/* Resumen del mes (siempre visible, aunque no se seleccione ningún día) */}
+        <div className="px-4 py-3 bg-surface-container/60 border-b border-outline-variant/30">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[11px] font-headline font-bold text-on-surface flex items-center gap-1.5 min-w-0">
+              <span className="material-symbols-outlined text-[15px] text-primary">
+                query_stats
+              </span>
+              <span className="truncate">Resumen de {monthName}</span>
+            </span>
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-primary shrink-0">
+              {diasActivos} {diasActivos === 1 ? 'día activo' : 'días activos'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="bg-surface-container-high/50 border border-outline-variant rounded-lg px-2 py-1.5 flex flex-col min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">
+                Ventas
+              </span>
+              <span className="text-xs font-extrabold text-on-surface tabular-nums truncate">
+                {monthSales.length}
+              </span>
+            </div>
+
+            <div className="bg-violet-500/10 border border-violet-500/25 rounded-lg px-2 py-1.5 flex flex-col min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-violet-400">
+                Ingresado
+              </span>
+              <span
+                className="text-xs font-extrabold text-on-surface tabular-nums truncate"
+                title={formatMoney(monthIngresado, displayCurrency, exchangeRate)}
+              >
+                {formatMoney(monthIngresado, displayCurrency, exchangeRate)}
+              </span>
+            </div>
+
+            <div className="bg-rose-500/10 border border-rose-500/25 rounded-lg px-2 py-1.5 flex flex-col min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-rose-400">
+                Gastado
+              </span>
+              <span
+                className="text-xs font-extrabold text-rose-300 tabular-nums truncate"
+                title={`${formatMoney(monthGastado, displayCurrency, exchangeRate)} (mercancía + ${formatMoney(monthGastosOperativos, displayCurrency, exchangeRate)} gastos op.)`}
+              >
+                {formatMoney(monthGastado, displayCurrency, exchangeRate)}
+              </span>
+            </div>
+
+            <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-2 py-1.5 flex flex-col min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400">
+                Ganancia
+              </span>
+              <span
+                className={`text-xs font-extrabold tabular-nums truncate ${
+                  monthGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+                title={formatMoney(monthGanancia, displayCurrency, exchangeRate)}
+              >
+                {formatMoney(monthGanancia, displayCurrency, exchangeRate)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 mt-2 text-[10px]">
+            <span className="flex items-center gap-1 min-w-0">
+              <span className="material-symbols-outlined text-[13px] text-amber-400">
+                emoji_events
+              </span>
+              <span className="text-on-surface-variant shrink-0">Mejor día:</span>
+              {bestDayLabel ? (
+                <>
+                  <strong className="text-on-surface truncate">{bestDayLabel}</strong>
+                  <span
+                    className={`font-bold shrink-0 ${
+                      bestDay && bestDay.ganancia >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {bestDay && bestDay.ganancia >= 0 ? '+' : ''}
+                    {formatMoney(bestDay ? bestDay.ganancia : 0, displayCurrency, exchangeRate)}
+                  </span>
+                </>
+              ) : (
+                <span className="text-on-surface-variant italic">Sin ventas este mes</span>
+              )}
+            </span>
+
+            <span className="text-on-surface-variant shrink-0">
+              Margen{' '}
+              <strong className={monthGanancia >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                {monthMargenPct.toFixed(0)}%
+              </strong>
+            </span>
           </div>
         </div>
 

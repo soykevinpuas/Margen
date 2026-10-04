@@ -5,6 +5,7 @@ import {
   Sale,
   BatchAllocation,
   ProductBadge,
+  OperatingExpense,
 } from '../types';
 
 /**
@@ -49,13 +50,15 @@ export function formatMoneyCompact(
   exchangeRate: number
 ): string {
   const converted = convertCurrency(montoMXN, currency, exchangeRate);
-  if (Math.abs(converted) >= 1000000) {
-    return `$${(converted / 1000000).toFixed(1)}M`;
+  const sign = converted < 0 ? '-' : '';
+  const abs = Math.abs(converted);
+  if (abs >= 1000000) {
+    return `${sign}$${(abs / 1000000).toFixed(1)}M`;
   }
-  if (Math.abs(converted) >= 1000) {
-    return `$${(converted / 1000).toFixed(0)}k`;
+  if (abs >= 1000) {
+    return `${sign}$${(abs / 1000).toFixed(0)}k`;
   }
-  return `$${converted.toFixed(0)}`;
+  return `${sign}$${abs.toFixed(0)}`;
 }
 
 /**
@@ -195,6 +198,125 @@ export function getProductBadges(
   }
 
   return badges.slice(0, 2);
+}
+
+/* ============================================================
+ * PERIOD HELPERS (día / semana / mes)
+ * ============================================================ */
+
+/** Temporalities used by the dashboard KPIs and charts. */
+export type MetricPeriod = 'dia' | 'sem' | 'mes';
+
+/** Human readable label for each temporalidad (chip display). */
+export const METRIC_PERIOD_LABEL: Record<MetricPeriod, string> = {
+  mes: 'Mes',
+  sem: 'Semana',
+  dia: 'Día',
+};
+
+/**
+ * Returns the inclusive YYYY-MM-DD range for a period, relative to `reference`.
+ * - 'dia'  -> today
+ * - 'sem'  -> rolling last 7 days (today included)
+ * - 'mes'  -> current calendar month
+ */
+export function getPeriodRange(
+  period: MetricPeriod,
+  reference: Date = new Date()
+): { startKey: string; endKey: string } {
+  const year = reference.getFullYear();
+  const month = reference.getMonth();
+  const day = reference.getDate();
+  // Noon anchor avoids DST / timezone drift when building local dates
+  const keyOf = (y: number, m: number, d: number) =>
+    getLocalDateKey(new Date(y, m, d, 12, 0, 0));
+
+  if (period === 'dia') {
+    const todayKey = keyOf(year, month, day);
+    return { startKey: todayKey, endKey: todayKey };
+  }
+
+  if (period === 'sem') {
+    return {
+      startKey: keyOf(year, month, day - 6),
+      endKey: keyOf(year, month, day),
+    };
+  }
+
+  return {
+    startKey: keyOf(year, month, 1),
+    endKey: keyOf(year, month + 1, 0),
+  };
+}
+
+/** Checks if a date (ISO string, YYYY-MM-DD or Date) falls inside a period. */
+export function isDateInPeriod(
+  dateInput: string | Date | undefined,
+  period: MetricPeriod,
+  reference: Date = new Date()
+): boolean {
+  const key = getLocalDateKey(dateInput);
+  if (!key) return false;
+  const { startKey, endKey } = getPeriodRange(period, reference);
+  return key >= startKey && key <= endKey;
+}
+
+export interface PeriodTotals {
+  /** Money actually received (confirmed sales). */
+  ingresosMXN: number;
+  /** Cost of the units sold. */
+  cogsMXN: number;
+  /** Operating expenses of the business. */
+  gastosOperativosMXN: number;
+  /** COGS + operating expenses. */
+  gastoMXN: number;
+  /** ingresos - gasto (net result of the period). */
+  gananciaMXN: number;
+  ventasCount: number;
+  /** ganancia / ingresos * 100 */
+  margenPct: number;
+}
+
+/**
+ * Aggregates sales + operating expenses for a period (día / semana / mes).
+ * Uses only confirmed sales.
+ */
+export function getPeriodTotals(
+  sales: Sale[],
+  operatingExpenses: OperatingExpense[],
+  period: MetricPeriod,
+  reference: Date = new Date()
+): PeriodTotals {
+  const { startKey, endKey } = getPeriodRange(period, reference);
+  const inRange = (dateInput?: string) => {
+    const key = getLocalDateKey(dateInput);
+    return key !== '' && key >= startKey && key <= endKey;
+  };
+
+  const periodSales = sales.filter(
+    (s) => s.estado === 'confirmada' && inRange(s.fecha)
+  );
+  const ingresosMXN = periodSales.reduce((acc, s) => acc + s.ingresoTotalMXN, 0);
+  const cogsMXN = periodSales.reduce(
+    (acc, s) => acc + s.costoUnidadesVendidasMXN,
+    0
+  );
+  const gastosOperativosMXN = operatingExpenses
+    .filter((e) => inRange(e.fecha))
+    .reduce((acc, e) => acc + e.montoMXN, 0);
+
+  const gastoMXN = cogsMXN + gastosOperativosMXN;
+  const gananciaMXN = ingresosMXN - gastoMXN;
+
+  return {
+    ingresosMXN,
+    cogsMXN,
+    gastosOperativosMXN,
+    gastoMXN,
+    gananciaMXN,
+    ventasCount: periodSales.length,
+    margenPct: ingresosMXN > 0 ? (gananciaMXN / ingresosMXN) * 100 : 0,
+  };
 }
 
 /**

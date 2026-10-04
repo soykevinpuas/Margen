@@ -72,3 +72,27 @@
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* KPI temporalidad rotation indicator (5s auto-cycle) */
+@keyframes kpiCycle {
+  from {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 0.55;
+  }
+}
+
+.animate-kpi-cycle {
+  transform-origin: left center;
+  animation: kpiCycle 5s linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-kpi-cycle {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+

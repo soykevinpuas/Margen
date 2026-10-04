@@ -321,7 +321,7 @@ export const GraficasView: React.FC = () => {
             </div>
           ) : (
             <span className="text-on-surface-variant/70 italic text-[10px]">
-              👆 Selecciona cualquier barra o punto para ver los números de ese día
+              👆 Desliza ↔ para recorrer los días y toca una barra para ver sus números
             </span>
           )}
         </div>
