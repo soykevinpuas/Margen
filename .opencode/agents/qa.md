@@ -1,7 +1,7 @@
 ---
 description: Revisa código, busca bugs y edge cases
 mode: subagent
-model: deepseek/deepseek-reasoner
+model: opencode/space-bunny-free
 permission:
   edit: deny
   bash:

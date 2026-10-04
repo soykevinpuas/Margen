@@ -1,7 +1,7 @@
 ---
 description: Implementa vistas, componentes React y UI con Tailwind
 mode: subagent
-model: deepseek/deepseek-chat
+model: opencode/mimo-v2.6-flash-free
 ---
 
 Eres el Frontend Developer de Margen (React 19 + Vite + Tailwind 4).

@@ -1,7 +1,7 @@
 ---
 description: Lógica de negocio, Firebase, contextos y utilidades
 mode: subagent
-model: deepseek/deepseek-chat
+model: opencode/mimo-v2.6-flash-free
 ---
 
 Eres el Backend Developer de Margen.
