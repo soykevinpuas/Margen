@@ -43,6 +43,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
     subtitle: `Categoría: ${e.categoria}`,
     montoMXN: e.montoMXN,
     fecha: e.fecha,
+    notas: e.notas,
     tag: 'Gasto Operativo',
     color: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
   }));
@@ -54,6 +55,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
     subtitle: `${s.cantidad} unidad(es) de mercancía vendida`,
     montoMXN: s.costoUnidadesVendidasMXN,
     fecha: s.fecha,
+    notas: s.notas,
     tag: 'Mercancía Vendida',
     color: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
   }));
@@ -66,6 +68,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
       subtitle: `Proveedor: ${b.proveedor || 'N/A'}`,
       montoMXN: g.montoMXN,
       fecha: b.fecha,
+      notas: b.notas,
       tag: 'Gasto de Compra',
       color: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
     }))
@@ -214,7 +217,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
                 key={item.id}
                 className="bg-surface-container border border-outline-variant/40 rounded-xl p-3 flex justify-between items-center hover:border-outline-variant transition-colors"
               >
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-on-surface text-xs">{item.title}</span>
                     <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${item.color}`}>
@@ -224,6 +227,11 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
                   <p className="text-[10px] text-on-surface-variant">
                     {item.subtitle} • {item.fecha ? item.fecha.slice(0, 10) : ''}
                   </p>
+                  {item.notas && (
+                    <p className="text-[11px] text-on-surface-variant italic truncate">
+                      {item.notas}
+                    </p>
+                  )}
                 </div>
 
                 <div className="text-right">

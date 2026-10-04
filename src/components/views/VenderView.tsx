@@ -7,12 +7,14 @@ import {
   getLocalDateKey,
 } from '../../utils/calculations';
 import { Product, SaleExpenseItem } from '../../types';
+import { TicketModal } from '../modals/TicketModal';
 
 interface VenderViewProps {
   preselectedProductId?: string | null;
   onSaleSuccess: () => void;
   onGoToHistory: () => void;
   onOpenNuevoProducto?: () => void;
+  onCloseVender?: () => void;
 }
 
 export const VenderView: React.FC<VenderViewProps> = ({
@@ -20,6 +22,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
   onSaleSuccess,
   onGoToHistory,
   onOpenNuevoProducto,
+  onCloseVender,
 }) => {
   const { settings, products, batches, sales, addSale, cancelSale, updateSaleDate } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -42,12 +45,18 @@ export const VenderView: React.FC<VenderViewProps> = ({
   const [sheetSearch, setSheetSearch] = useState<string>('');
   const [isSuccessScreen, setIsSuccessScreen] = useState<boolean>(false);
   const [lastCompletedSaleInfo, setLastCompletedSaleInfo] = useState<{
+    saleId: string;
+    fecha: string;
     revenue: number;
     profit: number;
+    costMXN: number;
+    expensesTotalMXN: number;
     productName: string;
     quantity: number;
     unitPrice: number;
     marginPct: number;
+    metodo: string;
+    notas?: string;
     expenses: SaleExpenseItem[];
     remainingStock: number;
   } | null>(null);
@@ -149,14 +158,20 @@ export const VenderView: React.FC<VenderViewProps> = ({
     });
 
     if (res.success && res.sale) {
-      const remainingStock = availableStock - numericQty;
+      const remainingStock = availableStock - res.sale.cantidad;
       setLastCompletedSaleInfo({
+        saleId: res.sale.id,
+        fecha: res.sale.fecha,
         revenue: res.sale.ingresoTotalMXN,
         profit: res.sale.gananciaVentaMXN,
+        costMXN: res.sale.costoUnidadesVendidasMXN,
+        expensesTotalMXN: res.sale.gastosDeVentaTotalMXN,
         productName: selectedProduct.nombre,
-        quantity: numericQty,
-        unitPrice: numericPrice,
-        marginPct,
+        quantity: res.sale.cantidad,
+        unitPrice: res.sale.precioVentaUnitarioMXN,
+        marginPct: res.sale.margenPorcentaje,
+        metodo: res.sale.metodoAsignacion,
+        notas: res.sale.notas,
         expenses: expenses.filter((e) => e.montoMXN > 0),
         remainingStock: Math.max(0, remainingStock),
       });
@@ -197,147 +212,44 @@ export const VenderView: React.FC<VenderViewProps> = ({
     });
 
   if (isSuccessScreen && lastCompletedSaleInfo) {
+    const info = lastCompletedSaleInfo;
     return (
-      <div className="flex flex-col items-center text-center px-5 pt-8 pb-24 animate-fade-in max-w-lg mx-auto">
-        {/* Success Icon */}
-        <div className="relative flex items-center justify-center w-full h-32 mb-1">
-          <div className="absolute bg-emerald-500/20 w-28 h-28 blur-3xl rounded-full animate-pulse"></div>
-          <div className="relative z-10 w-20 h-20 bg-surface-container-highest rounded-full flex items-center justify-center shadow-xl border border-emerald-500/30">
-            <span
-              className="material-symbols-outlined text-[46px] text-emerald-400"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              check_circle
-            </span>
-          </div>
-        </div>
-
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          Inventario Descontado por Antigüedad
-        </span>
-
-        <h1 className="text-2xl font-headline font-bold text-on-surface tracking-tight mb-1">
-          ¡Venta Registrada Con Éxito!
-        </h1>
-        <p className="text-on-surface-variant text-xs max-w-[320px] mb-6">
-          La transacción se guardó correctamente y el margen real fue calculado.
-        </p>
-
-        {/* Summary Card */}
-        <div className="w-full bg-surface-container border border-outline-variant/60 rounded-2xl p-4 flex flex-col gap-3.5 shadow-md text-left mb-6">
-          {/* Main Revenue Header */}
-          <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
-            <div>
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                Ingreso Total (Cobrado)
-              </span>
-              <span className="text-2xl font-headline font-extrabold text-on-surface">
-                {formatMoney(lastCompletedSaleInfo.revenue, displayCurrency, exchangeRate)}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                Margen Neto Real
-              </span>
-              <span className={`text-base font-extrabold ${lastCompletedSaleInfo.marginPct >= 0 ? 'text-emerald-400' : 'text-error'}`}>
-                {lastCompletedSaleInfo.marginPct.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-
-          {/* Product & Quantity details */}
-          <div className="grid grid-cols-2 gap-3 bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/30">
-            <div>
-              <span className="text-[10px] text-on-surface-variant uppercase tracking-wider block font-bold">
-                Producto Vendido
-              </span>
-              <span className="text-xs font-bold text-on-surface truncate block">
-                {lastCompletedSaleInfo.productName}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] text-on-surface-variant uppercase tracking-wider block font-bold">
-                Cantidad / Precio Unitario
-              </span>
-              <span className="text-xs font-bold text-on-surface block">
-                {lastCompletedSaleInfo.quantity} und. × {formatMoney(lastCompletedSaleInfo.unitPrice, displayCurrency, exchangeRate)}
-              </span>
-            </div>
-          </div>
-
-          {/* Profit Row */}
-          <div className="flex items-center justify-between bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <span className="material-symbols-outlined text-[18px]">
-                  trending_up
-                </span>
-              </div>
-              <div>
-                <span className="text-xs font-bold text-on-surface block">Utilidad Obtenida</span>
-                <span className="text-[10px] text-on-surface-variant">Descontando costo de lote y gastos</span>
-              </div>
-            </div>
-            <span className="text-base font-extrabold text-emerald-400">
-              +{formatMoney(lastCompletedSaleInfo.profit, displayCurrency, exchangeRate)}
-            </span>
-          </div>
-
-          {/* Additional details */}
-          <div className="space-y-1.5 text-xs text-on-surface-variant px-1 pt-1">
-            <div className="flex items-center justify-between">
-              <span>Stock Restante del Producto:</span>
-              <span className="font-bold text-on-surface">
-                {lastCompletedSaleInfo.remainingStock} unidades
-              </span>
-            </div>
-
-            {lastCompletedSaleInfo.expenses && lastCompletedSaleInfo.expenses.length > 0 && (
-              <div className="border-t border-outline-variant/20 pt-2 mt-2 space-y-1">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                  Gastos de Venta Aplicados ({lastCompletedSaleInfo.expenses.length})
-                </span>
-                {lastCompletedSaleInfo.expenses.map((exp, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-[11px]">
-                    <span>• {exp.nombre || 'Gasto'}:</span>
-                    <span className="font-mono font-bold">
-                      {formatMoney(exp.montoMXN, displayCurrency, exchangeRate)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 w-full">
-          <button
-            onClick={handleNewSale}
-            className="flex-1 bg-primary text-on-primary font-bold text-xs py-3.5 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
-          >
-            <span
-              className="material-symbols-outlined text-[18px]"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              add_circle
-            </span>
-            Registrar Otra Venta
-          </button>
-
-          <button
-            onClick={() => {
-              setIsSuccessScreen(false);
-              setActiveTab('historial');
-            }}
-            className="flex-1 bg-surface-container border border-outline-variant text-on-surface font-bold text-xs py-3.5 rounded-xl hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2"
-          >
-            <span className="material-symbols-outlined text-[18px]">history</span>
-            Ver Historial de Ventas
-          </button>
-        </div>
-      </div>
+      <TicketModal
+        isOpen
+        type="venta"
+        title="¡Venta Registrada Con Éxito!"
+        subtitle="Transacción guardada y margen real calculado"
+        folio={info.saleId}
+        fecha={info.fecha}
+        lines={[
+          { label: info.productName, text: `${info.quantity} und.` },
+          { label: 'Precio unitario', amount: info.unitPrice },
+          { label: `Costo mercancía (${info.metodo || 'FIFO'})`, amount: info.costMXN },
+          ...(info.expensesTotalMXN > 0 ? [{ label: 'Gastos de venta', amount: info.expensesTotalMXN }] : []),
+        ]}
+        totalLabel="Ingreso Cobrado"
+        totalAmount={info.revenue}
+        meta={[
+          {
+            label: 'Ganancia',
+            value: formatMoney(info.profit, displayCurrency, exchangeRate),
+          },
+          { label: 'Margen', value: `${info.marginPct.toFixed(1)}%` },
+          { label: 'Stock restante', value: `${info.remainingStock} und.` },
+          { label: 'Método', value: info.metodo },
+        ]}
+        notas={info.notas}
+        onSecondary={() => {
+          setIsSuccessScreen(false);
+          onGoToHistory();
+        }}
+        onPrimary={handleNewSale}
+        onClose={() => {
+          setIsSuccessScreen(false);
+          setLastCompletedSaleInfo(null);
+          onCloseVender?.();
+        }}
+      />
     );
   }
 

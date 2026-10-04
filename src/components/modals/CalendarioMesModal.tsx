@@ -453,6 +453,11 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                               <span>•</span>
                               <span>{s.cantidad} u.</span>
                             </div>
+                            {s.notas && (
+                              <div className="text-[11px] text-on-surface-variant italic truncate">
+                                {s.notas}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <span className="font-bold text-emerald-400 text-xs shrink-0">
@@ -468,9 +473,21 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                   <p className="text-outline text-[9px] italic">Sin gastos registrados en esta fecha</p>
                 ) : (
                   selectedStats.dayExpenses.map((e) => (
-                    <div key={e.id} className="flex justify-between items-center bg-surface-container-high p-1.5 rounded border border-outline-variant/30">
-                      <span>{e.concepto}</span>
-                      <span className="font-bold text-rose-400">-{formatMoney(e.montoMXN, displayCurrency, exchangeRate)}</span>
+                    <div
+                      key={e.id}
+                      className="bg-surface-container-high p-1.5 rounded border border-outline-variant/30"
+                    >
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="min-w-0 truncate">{e.concepto}</span>
+                        <span className="font-bold text-rose-400 shrink-0">
+                          -{formatMoney(e.montoMXN, displayCurrency, exchangeRate)}
+                        </span>
+                      </div>
+                      {e.notas && (
+                        <div className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                          {e.notas}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}

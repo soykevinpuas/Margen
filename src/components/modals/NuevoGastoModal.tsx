@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { OperatingExpense } from '../../types';
+import { TicketModal } from './TicketModal';
 
 interface NuevoGastoModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Abre el modal de Gasto Histórico (los modales viven en App) */
+  onViewHistorial?: () => void;
 }
 
 export const NuevoGastoModal: React.FC<NuevoGastoModalProps> = ({
   isOpen,
   onClose,
+  onViewHistorial,
 }) => {
   const { addOperatingExpense } = useApp();
 
@@ -22,6 +26,9 @@ export const NuevoGastoModal: React.FC<NuevoGastoModalProps> = ({
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [notas, setNotas] = useState('');
 
+  // Ticket del último gasto registrado (se muestra al confirmar)
+  const [lastExpenseTicket, setLastExpenseTicket] = useState<OperatingExpense | null>(null);
+
   const resetForm = () => {
     setConcepto('');
     setCategoria('renta');
@@ -29,6 +36,7 @@ export const NuevoGastoModal: React.FC<NuevoGastoModalProps> = ({
     setFecha(new Date().toISOString().split('T')[0]);
     setEsRecurrente(false);
     setNotas('');
+    setLastExpenseTicket(null);
   };
 
   useEffect(() => {
@@ -44,7 +52,7 @@ export const NuevoGastoModal: React.FC<NuevoGastoModalProps> = ({
     const numericMonto = parseFloat(monto) || 0;
     if (!concepto.trim() || numericMonto <= 0) return;
 
-    addOperatingExpense({
+    const created = addOperatingExpense({
       concepto: concepto.trim(),
       categoria,
       montoMXN: numericMonto,
@@ -53,9 +61,43 @@ export const NuevoGastoModal: React.FC<NuevoGastoModalProps> = ({
       notas,
     });
 
-    resetForm();
-    onClose();
+    // En lugar de cerrar sin avisar, mostramos el ticket del gasto
+    setLastExpenseTicket(created);
   };
+
+  // Ticket del gasto registrado (recibo tipo ticket)
+  if (lastExpenseTicket) {
+    const info = lastExpenseTicket;
+    return (
+      <TicketModal
+        isOpen
+        type="gasto"
+        title="¡Gasto Registrado Con Éxito!"
+        subtitle="El egreso se guardó y se descontó de tus ganancias"
+        folio={info.id}
+        fecha={info.fecha}
+        lines={[{ label: info.concepto, amount: info.montoMXN }]}
+        totalLabel="Total Gasto"
+        totalAmount={info.montoMXN}
+        meta={[
+          { label: 'Categoría', value: info.categoria },
+          { label: 'Frecuencia', value: info.esRecurrente ? 'Recurrente' : 'Único' },
+          { label: 'Tipo', value: 'Gasto operativo' },
+        ]}
+        notas={info.notas}
+        onSecondary={() => {
+          setLastExpenseTicket(null);
+          onClose();
+          if (onViewHistorial) onViewHistorial();
+        }}
+        onPrimary={() => resetForm()}
+        onClose={() => {
+          resetForm();
+          onClose();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">

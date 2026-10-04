@@ -206,6 +206,11 @@ export const HistorialComprasModal: React.FC<HistorialComprasModalProps> = ({
                           {batch.fecha} • Proveedor:{' '}
                           {batch.proveedor || 'Sin especificar'}
                         </p>
+                        {batch.notas && (
+                          <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                            {batch.notas}
+                          </p>
+                        )}
                       </div>
                     </div>
 

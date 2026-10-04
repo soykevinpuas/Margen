@@ -12,12 +12,15 @@ interface InventarioViewProps {
   onSelectProduct: (productId: string) => void;
   onOpenNuevoProducto: () => void;
   onOpenCompra: (productId?: string | null) => void;
+  /** Abre el overlay de Venta con ese producto preseleccionado */
+  onOpenVender: (productId: string) => void;
 }
 
 export const InventarioView: React.FC<InventarioViewProps> = ({
   onSelectProduct,
   onOpenNuevoProducto,
   onOpenCompra,
+  onOpenVender,
 }) => {
   const {
     settings,
@@ -281,7 +284,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex justify-between items-end mt-2">
+                            <div className="flex justify-between items-end mt-2 gap-2">
                               <span className="text-xs font-bold text-on-surface">
                                 Sug:{' '}
                                 {formatMoney(
@@ -290,18 +293,33 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   exchangeRate
                                 )}
                               </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenCompra(p.id);
-                                }}
-                                title="Comprar stock"
-                                className="text-on-surface-variant hover:text-primary"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">
-                                  add_shopping_cart
-                                </span>
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (stock > 0) onOpenVender(p.id);
+                                  }}
+                                  title="Vender este producto"
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-on-primary text-[10px] font-bold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+                                >
+                                  <span className="material-symbols-outlined text-[14px]">
+                                    point_of_sale
+                                  </span>
+                                  Vender
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenCompra(p.id);
+                                  }}
+                                  title="Comprar stock"
+                                  className="w-7 h-7 flex items-center justify-center rounded-md border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">
+                                    add_shopping_cart
+                                  </span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -364,7 +382,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex justify-between items-end mt-2">
+                            <div className="flex justify-between items-end mt-2 gap-2">
                               <span className="text-xs font-bold text-on-surface">
                                 Sug:{' '}
                                 {formatMoney(
@@ -373,6 +391,33 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                                   exchangeRate
                                 )}
                               </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (stock > 0) onOpenVender(p.id);
+                                  }}
+                                  title="Vender este producto"
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-on-primary text-[10px] font-bold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+                                >
+                                  <span className="material-symbols-outlined text-[14px]">
+                                    point_of_sale
+                                  </span>
+                                  Vender
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenCompra(p.id);
+                                  }}
+                                  title="Comprar stock"
+                                  className="w-7 h-7 flex items-center justify-center rounded-md border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">
+                                    add_shopping_cart
+                                  </span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -469,6 +514,11 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                         <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">
                           {batch.fecha} • Proveedor: {batch.proveedor || 'Sin especificar'}
                         </p>
+                        {batch.notas && (
+                          <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                            {batch.notas}
+                          </p>
+                        )}
                       </div>
                     </div>
 

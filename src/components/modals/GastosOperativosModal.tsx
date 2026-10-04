@@ -82,7 +82,7 @@ export const GastosOperativosModal: React.FC<GastosOperativosModalProps> = ({
                 key={exp.id}
                 className="bg-surface-container border border-outline-variant rounded-xl p-3 flex justify-between items-center"
               >
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-on-surface text-xs">
                       {exp.concepto}
@@ -96,6 +96,11 @@ export const GastosOperativosModal: React.FC<GastosOperativosModalProps> = ({
                   <p className="text-[10px] text-on-surface-variant capitalize mt-0.5">
                     Cat: {exp.categoria} • {exp.fecha}
                   </p>
+                  {exp.notas && (
+                    <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                      {exp.notas}
+                    </p>
+                  )}
                 </div>
 
                 <div className="text-right font-bold text-error text-sm">

@@ -168,6 +168,11 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
                         <p className="text-[10px] text-on-surface-variant truncate">
                           {new Date(sale.fecha).toLocaleString()} • {sale.cantidad} u.
                         </p>
+                        {sale.notas && (
+                          <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                            {sale.notas}
+                          </p>
+                        )}
                       </div>
                     </div>
 

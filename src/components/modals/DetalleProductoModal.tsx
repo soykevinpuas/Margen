@@ -13,6 +13,8 @@ interface DetalleProductoModalProps {
   onClose: () => void;
   onOpenEditProduct: (productId: string) => void;
   onOpenNewBatchForProduct: (productId: string) => void;
+  /** Abre el overlay de Venta con este producto preseleccionado */
+  onOpenVender?: (productId: string) => void;
 }
 
 export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
@@ -20,6 +22,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
   onClose,
   onOpenEditProduct,
   onOpenNewBatchForProduct,
+  onOpenVender,
 }) => {
   const {
     settings,
@@ -96,6 +99,16 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onOpenVender && totalStock > 0 && (
+              <button
+                onClick={() => onOpenVender(product.id)}
+                title="Vender este producto"
+                className="h-8 px-2.5 rounded-full bg-primary text-on-primary flex items-center justify-center gap-1 text-[11px] font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[15px]">point_of_sale</span>
+                Vender
+              </button>
+            )}
             <button
               onClick={() => onOpenEditProduct(product.id)}
               title="Editar producto"
@@ -347,14 +360,21 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                     key={sale.id}
                     className="bg-surface-container border border-outline-variant/40 rounded-lg p-2.5 flex justify-between items-center text-[11px]"
                   >
-                    <div>
-                      <span className="font-mono text-on-surface font-bold">
-                        {sale.id}
-                      </span>
-                      <span className="text-on-surface-variant ml-2">
-                        {sale.cantidad} und. •{' '}
-                        {new Date(sale.fecha).toLocaleDateString()}
-                      </span>
+                    <div className="min-w-0">
+                      <div>
+                        <span className="font-mono text-on-surface font-bold">
+                          {sale.id}
+                        </span>
+                        <span className="text-on-surface-variant ml-2">
+                          {sale.cantidad} und. •{' '}
+                          {new Date(sale.fecha).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {sale.notas && (
+                        <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                          {sale.notas}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-on-surface">

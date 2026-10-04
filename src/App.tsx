@@ -17,6 +17,7 @@ import { DetalleProductoModal } from './components/modals/DetalleProductoModal';
 import { HistorialVentasModal } from './components/modals/HistorialVentasModal';
 import { HistorialComprasModal } from './components/modals/HistorialComprasModal';
 import { GastosOperativosModal } from './components/modals/GastosOperativosModal';
+import { GastoHistoricoModal } from './components/modals/GastoHistoricoModal';
 import { AjusteInventarioModal } from './components/modals/AjusteInventarioModal';
 import { NuevoProductoModal } from './components/modals/NuevoProductoModal';
 import { ConfiguracionModal } from './components/modals/ConfiguracionModal';
@@ -35,6 +36,7 @@ export const AppContent: React.FC = () => {
   const [isHistorialComprasOpen, setIsHistorialComprasOpen] = useState(false);
   const [isHistorialVentasOpen, setIsHistorialVentasOpen] = useState(false);
   const [isGastosOperativosOpen, setIsGastosOperativosOpen] = useState(false);
+  const [isGastoHistoricoOpen, setIsGastoHistoricoOpen] = useState(false);
   const [isAjusteInventarioOpen, setIsAjusteInventarioOpen] = useState(false);
   const [isConfiguracionOpen, setIsConfiguracionOpen] = useState(false);
   const [isNuevoProductoOpen, setIsNuevoProductoOpen] = useState(false);
@@ -66,6 +68,13 @@ export const AppContent: React.FC = () => {
   const handleOpenNewBatchForProduct = (productId: string) => {
     setSelectedProductId(null);
     setIsCompraOpen(true);
+  };
+
+  /** Abre el overlay de Venta con un producto preseleccionado (desde Inventario / detalle) */
+  const handleOpenVenderConProducto = (productId: string | null) => {
+    setSelectedProductId(null);
+    setPreselectedProductForSale(productId);
+    setOverlayView('vender');
   };
 
   // 1. Loading State
@@ -145,7 +154,7 @@ export const AppContent: React.FC = () => {
           {overlayView === null && activeTab === 'inicio' && (
             <InicioView
               onNavigateTab={(tab) => setActiveTab(tab)}
-              onOpenVender={() => setOverlayView('vender')}
+              onOpenVender={(pid) => handleOpenVenderConProducto(pid ?? null)}
               onOpenGraficas={() => setOverlayView('graficas')}
               onOpenCompra={(pid) => { setPreselectedCompraProduct(pid ?? null); setIsCompraOpen(true); }}
               onOpenGasto={() => setIsGastoOpen(true)}
@@ -161,6 +170,7 @@ export const AppContent: React.FC = () => {
                 setIsNuevoProductoOpen(true);
               }}
               onOpenCompra={(pid) => { setPreselectedCompraProduct(pid ?? null); setIsCompraOpen(true); }}
+              onOpenVender={(pid) => handleOpenVenderConProducto(pid)}
             />
           )}
 
@@ -181,11 +191,16 @@ export const AppContent: React.FC = () => {
                   setPreselectedProductForSale(null);
                 }}
                 onGoToHistory={() => {
+                  setOverlayView(null);
                   setIsHistorialVentasOpen(true);
                 }}
                 onOpenNuevoProducto={() => {
                   setEditingProductId(null);
                   setIsNuevoProductoOpen(true);
+                }}
+                onCloseVender={() => {
+                  setOverlayView(null);
+                  setPreselectedProductForSale(null);
                 }}
               />
             </div>
@@ -213,6 +228,7 @@ export const AppContent: React.FC = () => {
               onOpenHistorialCompras={() => setIsHistorialComprasOpen(true)}
               onOpenHistorialVentas={() => setIsHistorialVentasOpen(true)}
               onOpenGastosOperativos={() => setIsGastosOperativosOpen(true)}
+              onOpenGastoHistorico={() => setIsGastoHistoricoOpen(true)}
               onOpenAjusteInventario={() => setIsAjusteInventarioOpen(true)}
               onOpenConfiguracion={() => setIsConfiguracionOpen(true)}
               onOpenGraficas={() => setOverlayView('graficas')}
@@ -233,11 +249,13 @@ export const AppContent: React.FC = () => {
           setEditingProductId(null);
           setIsNuevoProductoOpen(true);
         }}
+        onViewHistorial={() => setIsHistorialComprasOpen(true)}
       />
 
       <NuevoGastoModal
         isOpen={isGastoOpen}
         onClose={() => setIsGastoOpen(false)}
+        onViewHistorial={() => setIsGastoHistoricoOpen(true)}
       />
 
       <DetalleProductoModal
@@ -245,6 +263,7 @@ export const AppContent: React.FC = () => {
         onClose={() => setSelectedProductId(null)}
         onOpenEditProduct={handleOpenEditProduct}
         onOpenNewBatchForProduct={handleOpenNewBatchForProduct}
+        onOpenVender={(pid) => handleOpenVenderConProducto(pid)}
       />
 
       <HistorialVentasModal
@@ -260,6 +279,11 @@ export const AppContent: React.FC = () => {
       <GastosOperativosModal
         isOpen={isGastosOperativosOpen}
         onClose={() => setIsGastosOperativosOpen(false)}
+      />
+
+      <GastoHistoricoModal
+        isOpen={isGastoHistoricoOpen}
+        onClose={() => setIsGastoHistoricoOpen(false)}
       />
 
       <AjusteInventarioModal

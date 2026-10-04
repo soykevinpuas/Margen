@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   formatMoney,
-  formatMoneyCompact,
   getProductTotalStock,
   getProductBadges,
   getPeriodTotals,
@@ -13,7 +12,8 @@ import { CalendarioMesModal } from '../modals/CalendarioMesModal';
 
 interface InicioViewProps {
   onNavigateTab: (tab: 'inicio' | 'inventario' | 'mas') => void;
-  onOpenVender: () => void;
+  /** Abre el overlay de Venta (opcionalmente con un producto preseleccionado) */
+  onOpenVender: (productId?: string | null) => void;
   onOpenGraficas: () => void;
   onOpenCompra: (productId?: string | null) => void;
   onOpenGasto: () => void;
@@ -176,12 +176,6 @@ export const InicioView: React.FC<InicioViewProps> = ({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <span
-              className="material-symbols-outlined text-[13px] text-primary animate-spin motion-reduce:hidden [animation-duration:4s]"
-              title={`Cambia cada ${CYCLE_MS / 1000} segundos`}
-            >
-              autorenew
-            </span>
             <div
               className="flex items-center gap-0.5 bg-surface-container-high border border-outline-variant rounded-full p-0.5"
               role="group"
@@ -207,8 +201,30 @@ export const InicioView: React.FC<InicioViewProps> = ({
         </div>
 
 
-        {/* 3 KPIs principales: Gasto · Ganancia · Entrada */}
+        {/* 3 KPIs principales: Ingreso · Gasto · Ganancia */}
         <div className="grid grid-cols-3 divide-x divide-outline-variant/40">
+          {/* INGRESO (entrada) */}
+          <div className="flex flex-col gap-1 px-2.5 py-3">
+            <div className="flex items-center gap-1 text-violet-400">
+              <span className="material-symbols-outlined text-[13px]">south_east</span>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider">
+                Ingreso
+              </span>
+            </div>
+            <span
+              className="font-headline font-extrabold text-[13px] leading-none text-violet-400 tabular-nums break-words leading-tight"
+              title={moneyTitle(totals.ingresosMXN)}
+            >
+              {formatMoney(entradaAnimated, displayCurrency, exchangeRate)}
+            </span>
+            <span
+              key={activePeriod}
+              className="text-[9px] leading-tight text-on-surface-variant animate-fade-in"
+            >
+              {totals.ventasCount} ventas
+            </span>
+          </div>
+
           {/* GASTO */}
           <div className="flex flex-col gap-1 px-2.5 py-3">
             <div className="flex items-center gap-1 text-rose-400">
@@ -220,10 +236,10 @@ export const InicioView: React.FC<InicioViewProps> = ({
               </span>
             </div>
             <span
-              className="font-headline font-extrabold text-[15px] leading-none text-rose-400 tabular-nums truncate"
+              className="font-headline font-extrabold text-[13px] leading-none text-rose-400 tabular-nums break-words leading-tight"
               title={moneyTitle(totals.gastoMXN)}
             >
-              {formatMoneyCompact(gastoAnimated, displayCurrency, exchangeRate)}
+              {formatMoney(gastoAnimated, displayCurrency, exchangeRate)}
             </span>
             <span className="text-[9px] leading-tight text-on-surface-variant">
               Costo + gastos
@@ -243,40 +259,18 @@ export const InicioView: React.FC<InicioViewProps> = ({
               </span>
             </div>
             <span
-              className={`font-headline font-extrabold text-[15px] leading-none tabular-nums truncate ${
+              className={`font-headline font-extrabold text-[13px] leading-none tabular-nums break-words leading-tight ${
                 isNegativeProfit ? 'text-rose-400' : 'text-emerald-400'
               }`}
               title={moneyTitle(totals.gananciaMXN)}
             >
-              {formatMoneyCompact(gananciaAnimated, displayCurrency, exchangeRate)}
+              {formatMoney(gananciaAnimated, displayCurrency, exchangeRate)}
             </span>
             <span
               key={activePeriod}
               className="text-[9px] leading-tight text-on-surface-variant animate-fade-in"
             >
               Margen {totals.margenPct.toFixed(0)}%
-            </span>
-          </div>
-
-          {/* ENTRADA (ingresos) */}
-          <div className="flex flex-col gap-1 px-2.5 py-3">
-            <div className="flex items-center gap-1 text-violet-400">
-              <span className="material-symbols-outlined text-[13px]">south_east</span>
-              <span className="text-[9px] font-extrabold uppercase tracking-wider">
-                Entrada
-              </span>
-            </div>
-            <span
-              className="font-headline font-extrabold text-[15px] leading-none text-violet-400 tabular-nums truncate"
-              title={moneyTitle(totals.ingresosMXN)}
-            >
-              {formatMoneyCompact(entradaAnimated, displayCurrency, exchangeRate)}
-            </span>
-            <span
-              key={activePeriod}
-              className="text-[9px] leading-tight text-on-surface-variant animate-fade-in"
-            >
-              {totals.ventasCount} ventas
             </span>
           </div>
         </div>
@@ -306,7 +300,9 @@ export const InicioView: React.FC<InicioViewProps> = ({
               className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors font-medium"
             >
               <span className="material-symbols-outlined text-[13px]">inventory_2</span>
-              {formatMoneyCompact(totalInventoryValueMXN, displayCurrency, exchangeRate)}
+              <span className="whitespace-nowrap tabular-nums">
+                {formatMoney(totalInventoryValueMXN, displayCurrency, exchangeRate)}
+              </span>
             </button>
             <button
               type="button"

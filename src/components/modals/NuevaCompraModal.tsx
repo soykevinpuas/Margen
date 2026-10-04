@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatMoney } from '../../utils/calculations';
 import { ExpenseItem } from '../../types';
+import { TicketModal } from './TicketModal';
 
 interface NuevaCompraModalProps {
   isOpen: boolean;
   onClose: () => void;
   preselectedProductId?: string;
   onOpenNuevoProducto?: () => void;
+  /** Abre el modal de Historial de Compras (los modales viven en App) */
+  onViewHistorial?: () => void;
 }
 
 export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
@@ -15,6 +18,7 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
   onClose,
   preselectedProductId,
   onOpenNuevoProducto,
+  onViewHistorial,
 }) => {
   const { settings, products, addPurchaseBatch } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -40,14 +44,17 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
 
   const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
   const [lastPurchaseInfo, setLastPurchaseInfo] = useState<{
+    batchId?: string;
     productName: string;
     quantity: number;
+    productCostMXN: number;
     realTotalCostMXN: number;
     realUnitCostMXN: number;
     supplier?: string;
     expenses: ExpenseItem[];
     isInitialInventory?: boolean;
     date: string;
+    notas?: string;
   } | null>(null);
 
   // Reset all modal form fields
@@ -166,16 +173,20 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
       esInventarioInicial: isInitialInventory,
     });
 
-    if (res.success) {
+    // addPurchaseBatch regresa directamente el lote creado (no un { success })
+    if (res) {
       setLastPurchaseInfo({
+        batchId: res.id,
         productName: selectedProd ? selectedProd.nombre : 'Producto',
-        quantity: numericQty,
-        realTotalCostMXN,
-        realUnitCostMXN,
+        quantity: res.cantidadComprada ?? numericQty,
+        productCostMXN: res.costoProductosMXN ?? numericProductTotal,
+        realTotalCostMXN: res.costoTotalMXN ?? realTotalCostMXN,
+        realUnitCostMXN: res.costoUnitarioRealMXN ?? realUnitCostMXN,
         supplier,
-        expenses: expenses.filter((e) => e.montoMXN > 0),
+        expenses: res.gastosDeCompra ?? expenses.filter((e) => e.montoMXN > 0),
         isInitialInventory,
-        date,
+        date: res.fecha ?? date,
+        notas: res.notas ?? notes,
       });
       setIsConfirmed(true);
     } else {
@@ -192,6 +203,51 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
     setNotes('');
     setIsInitialInventory(false);
   };
+
+  // Ticket de la compra confirmada (recibo tipo ticket)
+  if (isConfirmed && lastPurchaseInfo) {
+    const info = lastPurchaseInfo;
+    return (
+      <TicketModal
+        isOpen
+        type="compra"
+        title="¡Compra Registrada Con Éxito!"
+        subtitle="Stock actualizado y costo unitario real recalculado"
+        folio={info.batchId}
+        fecha={info.date}
+        lines={[
+          { label: info.productName, text: `${info.quantity} und.` },
+          { label: 'Costo producto', amount: info.productCostMXN },
+          ...info.expenses.map((exp) => ({
+            label: exp.nombre || 'Gasto de compra',
+            amount: exp.montoMXN,
+          })),
+        ]}
+        totalLabel="Total Invertido"
+        totalAmount={info.realTotalCostMXN}
+        meta={[
+          {
+            label: 'Costo unitario real',
+            value: `${formatMoney(info.realUnitCostMXN, displayCurrency, exchangeRate)} / und.`,
+          },
+          { label: 'Proveedor', value: info.supplier || 'Sin especificar' },
+          {
+            label: 'Método',
+            value: info.isInitialInventory ? 'Inventario inicial' : 'Compra de reposición',
+          },
+        ]}
+        notas={info.notas}
+        onSecondary={() => {
+          setIsConfirmed(false);
+          setLastPurchaseInfo(null);
+          onClose();
+          if (onViewHistorial) onViewHistorial();
+        }}
+        onPrimary={handleResetForAnotherPurchase}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
@@ -223,111 +279,6 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
           </button>
         </div>
 
-        {isConfirmed && lastPurchaseInfo ? (
-          <div className="p-6 flex flex-col items-center text-center space-y-4 overflow-y-auto max-h-[80vh]">
-            <div className="relative flex items-center justify-center my-1">
-              <div className="absolute bg-emerald-500/20 w-24 h-24 blur-2xl rounded-full animate-pulse"></div>
-              <div className="relative z-10 w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/30 text-emerald-400">
-                <span className="material-symbols-outlined text-4xl">check_circle</span>
-              </div>
-            </div>
-
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                Stock Actualizado en Tiempo Real
-              </span>
-              <h2 className="text-xl font-headline font-bold text-on-surface">
-                ¡Compra Registrada Con Éxito!
-              </h2>
-              <p className="text-xs text-on-surface-variant max-w-xs mt-1">
-                La mercancía ha ingresado al inventario y se recalculó el costo unitario real.
-              </p>
-            </div>
-
-            {/* Details Card */}
-            <div className="w-full bg-surface-container border border-outline-variant/60 rounded-xl p-4 text-left space-y-3">
-              <div className="flex items-center justify-between border-b border-outline-variant/30 pb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                  Producto
-                </span>
-                <span className="font-bold text-sm text-on-surface truncate max-w-[200px]">
-                  {lastPurchaseInfo.productName}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/30">
-                <div>
-                  <span className="text-[10px] text-on-surface-variant uppercase tracking-wider block font-bold">
-                    Cantidad Adquirida
-                  </span>
-                  <span className="text-base font-extrabold text-on-surface">
-                    {lastPurchaseInfo.quantity} <span className="text-xs font-normal">und.</span>
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-on-surface-variant uppercase tracking-wider block font-bold">
-                    Costo Total Invertido
-                  </span>
-                  <span className="text-base font-extrabold text-primary">
-                    {formatMoney(lastPurchaseInfo.realTotalCostMXN, displayCurrency, exchangeRate)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-on-surface-variant">Costo Real por Unidad:</span>
-                <span className="font-bold text-emerald-400">
-                  {formatMoney(lastPurchaseInfo.realUnitCostMXN, displayCurrency, exchangeRate)} / und.
-                </span>
-              </div>
-
-              {lastPurchaseInfo.supplier && (
-                <div className="flex items-center justify-between text-xs border-t border-outline-variant/20 pt-2">
-                  <span className="text-on-surface-variant">Proveedor:</span>
-                  <span className="font-semibold text-on-surface">{lastPurchaseInfo.supplier}</span>
-                </div>
-              )}
-
-              {lastPurchaseInfo.expenses && lastPurchaseInfo.expenses.length > 0 && (
-                <div className="border-t border-outline-variant/30 pt-2 space-y-1">
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Gastos Adicionales Prorrateados ({lastPurchaseInfo.expenses.length})
-                  </span>
-                  {lastPurchaseInfo.expenses.map((exp, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[11px] text-on-surface-variant">
-                      <span>• {exp.nombre || 'Gasto'}:</span>
-                      <span className="font-mono font-bold">
-                        {formatMoney(exp.montoMXN, displayCurrency, exchangeRate)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-2.5 w-full pt-2">
-              <button
-                type="button"
-                onClick={handleResetForAnotherPurchase}
-                className="flex-1 py-3 px-4 bg-surface-container border border-outline-variant text-on-surface font-bold text-xs rounded-xl hover:bg-surface-variant transition-all flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-base">add</span>
-                Registrar Otra Compra
-              </button>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-3 px-4 bg-primary text-on-primary font-bold text-xs rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-base">inventory_2</span>
-                Entendido / Ver Inventario
-              </button>
-            </div>
-          </div>
-        ) : (
           <form
             onSubmit={handleSubmit}
             className="p-4 space-y-4 overflow-y-auto flex-1 text-xs"
@@ -626,7 +577,6 @@ export const NuevaCompraModal: React.FC<NuevaCompraModalProps> = ({
             </button>
           </div>
         </form>
-        )}
       </div>
     </div>
   );
