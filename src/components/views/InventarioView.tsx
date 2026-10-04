@@ -36,6 +36,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'productos' | 'compras' | 'agotados'>('productos');
+  const [historialSub, setHistorialSub] = useState<'compras' | 'ventas'>('compras');
 
   // Editing batch state
   const [editingBatch, setEditingBatch] = useState<PurchaseBatch | null>(null);
@@ -434,6 +435,32 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
       {/* TAB 2: HISTORIAL DE COMPRAS (LOTES) */}
       {activeTab === 'compras' && (
         <div className="px-4 py-4 flex flex-col gap-3 text-xs">
+          {/* Sub-tabs: Compras | Ventas */}
+          <div className="flex bg-surface-container-high/80 border border-outline-variant/60 rounded-lg p-0.5 gap-1 mb-1">
+            <button
+              onClick={() => setHistorialSub('compras')}
+              className={`flex-1 py-1 px-2 text-[11px] font-extrabold rounded-md transition-all whitespace-nowrap ${
+                historialSub === 'compras'
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              Compras ({batches.length})
+            </button>
+            <button
+              onClick={() => setHistorialSub('ventas')}
+              className={`flex-1 py-1 px-2 text-[11px] font-extrabold rounded-md transition-all whitespace-nowrap ${
+                historialSub === 'ventas'
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              Ventas ({sales.length})
+            </button>
+          </div>
+
+          {historialSub === 'compras' ? (
+            <>
           <div className="flex justify-between items-center mb-1">
             <h2 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
               <span className="material-symbols-outlined text-[16px]">history_edu</span>
@@ -695,6 +722,91 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                 </div>
               );
             })
+          )}
+            </>
+          ) : (
+            <>
+              <h2 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1 mb-1">
+                <span className="material-symbols-outlined text-[16px]">point_of_sale</span>
+                Historial de Ventas
+              </h2>
+              {sales.filter((s) => {
+                const prod = products.find((p) => p.id === s.productoId);
+                const n = prod ? prod.nombre.toLowerCase() : '';
+                return (
+                  s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  n.includes(searchQuery.toLowerCase())
+                );
+              }).length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center bg-surface-container border border-outline-variant/50 rounded-xl p-6">
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-2">
+                    shopping_bag
+                  </span>
+                  <p className="text-sm font-bold text-on-surface">No hay ventas registradas</p>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    Registra una venta desde la card de producto o el overlay vender.
+                  </p>
+                </div>
+              ) : (
+                [...sales]
+                  .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+                  .filter((s) => {
+                    const prod = products.find((p) => p.id === s.productoId);
+                    const n = prod ? prod.nombre.toLowerCase() : '';
+                    return (
+                      s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      n.includes(searchQuery.toLowerCase())
+                    );
+                  })
+                  .map((s) => {
+                    const prod = products.find((p) => p.id === s.productoId);
+                    return (
+                      <div
+                        key={s.id}
+                        className="bg-surface-container border border-outline-variant rounded-xl p-3.5 space-y-1.5"
+                      >
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-on-surface text-xs">
+                                Venta {s.id}
+                              </span>
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                  s.estado === 'cancelada'
+                                    ? 'bg-error/20 text-error'
+                                    : 'bg-tertiary/20 text-tertiary'
+                                }`}
+                              >
+                                {s.estado}
+                              </span>
+                            </div>
+                            <h4 className="font-bold text-on-surface text-xs mt-0.5 truncate">
+                              {prod ? prod.nombre : 'Producto no encontrado'}
+                            </h4>
+                            <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">
+                              {s.fecha ? new Date(s.fecha).toLocaleDateString('es-MX') : ''} • {s.cantidad} u. • {s.metodoAsignacion}
+                            </p>
+                            {s.notas && (
+                              <p className="text-[11px] text-on-surface-variant italic truncate mt-0.5">
+                                {s.notas}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-on-surface">
+                              {formatMoney(s.ingresoTotalMXN, displayCurrency, exchangeRate)}
+                            </div>
+                            <div className="text-[10px] text-tertiary font-bold mt-0.5">
+                              Ganancia: {formatMoney(s.gananciaVentaMXN, displayCurrency, exchangeRate)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </>
           )}
         </div>
       )}
