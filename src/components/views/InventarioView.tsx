@@ -11,7 +11,7 @@ import {
 interface InventarioViewProps {
   onSelectProduct: (productId: string) => void;
   onOpenNuevoProducto: () => void;
-  onOpenCompra: () => void;
+  onOpenCompra: (productId?: string | null) => void;
 }
 
 export const InventarioView: React.FC<InventarioViewProps> = ({
@@ -293,7 +293,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onOpenCompra();
+                                  onOpenCompra(p.id);
                                 }}
                                 title="Comprar stock"
                                 className="text-on-surface-variant hover:text-primary"
@@ -731,7 +731,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onOpenCompra();
+                          onOpenCompra(p.id);
                         }}
                         className="text-[11px] text-primary font-bold hover:underline"
                       >

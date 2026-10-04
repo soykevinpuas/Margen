@@ -6,7 +6,7 @@ import { GananciasHistoricasModal } from '../modals/GananciasHistoricasModal';
 import { CompartirAmigoModal } from '../modals/CompartirAmigoModal';
 
 interface MasViewProps {
-  onOpenCompra: () => void;
+  onOpenCompra: (productId?: string | null) => void;
   onOpenGasto: () => void;
   onOpenHistorialCompras: () => void;
   onOpenHistorialVentas: () => void;

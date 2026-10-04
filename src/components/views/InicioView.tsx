@@ -15,7 +15,7 @@ interface InicioViewProps {
   onNavigateTab: (tab: 'inicio' | 'inventario' | 'mas') => void;
   onOpenVender: () => void;
   onOpenGraficas: () => void;
-  onOpenCompra: () => void;
+  onOpenCompra: (productId?: string | null) => void;
   onOpenGasto: () => void;
   onSelectProduct: (productId: string) => void;
 }
@@ -206,13 +206,6 @@ export const InicioView: React.FC<InicioViewProps> = ({
           </div>
         </div>
 
-        {/* Barra de progreso del ciclo automático */}
-        <div className="h-[3px] w-full bg-outline-variant/50">
-          <div
-            key={`${cycleKey}-${periodIndex}`}
-            className="h-full w-full bg-primary animate-kpi-cycle"
-          />
-        </div>
 
         {/* 3 KPIs principales: Gasto · Ganancia · Entrada */}
         <div className="grid grid-cols-3 divide-x divide-outline-variant/40">
@@ -474,7 +467,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onOpenCompra();
+                        onOpenCompra(p.id);
                       }}
                       title="Reponer stock"
                       className="px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors"
@@ -517,7 +510,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onOpenCompra();
+                          onOpenCompra(p.id);
                         }}
                         className="w-8 h-8 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center text-on-surface hover:text-primary transition-colors"
                       >

@@ -30,6 +30,7 @@ export const AppContent: React.FC = () => {
 
   // Modal States
   const [isCompraOpen, setIsCompraOpen] = useState(false);
+  const [preselectedCompraProduct, setPreselectedCompraProduct] = useState<string | null>(null);
   const [isGastoOpen, setIsGastoOpen] = useState(false);
   const [isHistorialComprasOpen, setIsHistorialComprasOpen] = useState(false);
   const [isHistorialVentasOpen, setIsHistorialVentasOpen] = useState(false);
@@ -146,7 +147,7 @@ export const AppContent: React.FC = () => {
               onNavigateTab={(tab) => setActiveTab(tab)}
               onOpenVender={() => setOverlayView('vender')}
               onOpenGraficas={() => setOverlayView('graficas')}
-              onOpenCompra={() => setIsCompraOpen(true)}
+              onOpenCompra={(pid) => { setPreselectedCompraProduct(pid ?? null); setIsCompraOpen(true); }}
               onOpenGasto={() => setIsGastoOpen(true)}
               onSelectProduct={handleSelectProduct}
             />
@@ -159,7 +160,7 @@ export const AppContent: React.FC = () => {
                 setEditingProductId(null);
                 setIsNuevoProductoOpen(true);
               }}
-              onOpenCompra={() => setIsCompraOpen(true)}
+              onOpenCompra={(pid) => { setPreselectedCompraProduct(pid ?? null); setIsCompraOpen(true); }}
             />
           )}
 
@@ -207,7 +208,7 @@ export const AppContent: React.FC = () => {
 
           {overlayView === null && activeTab === 'mas' && (
             <MasView
-              onOpenCompra={() => setIsCompraOpen(true)}
+              onOpenCompra={(pid) => { setPreselectedCompraProduct(pid ?? null); setIsCompraOpen(true); }}
               onOpenGasto={() => setIsGastoOpen(true)}
               onOpenHistorialCompras={() => setIsHistorialComprasOpen(true)}
               onOpenHistorialVentas={() => setIsHistorialVentasOpen(true)}
@@ -225,6 +226,7 @@ export const AppContent: React.FC = () => {
 
       {/* MODALS */}
       <NuevaCompraModal
+        preselectedProductId={preselectedCompraProduct}
         isOpen={isCompraOpen}
         onClose={() => setIsCompraOpen(false)}
         onOpenNuevoProducto={() => {
