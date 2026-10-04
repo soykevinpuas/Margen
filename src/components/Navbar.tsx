@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type TabType = 'inicio' | 'inventario' | 'vender' | 'graficas' | 'mas';
+export type TabType = 'inicio' | 'inventario' | 'mas';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -31,28 +31,6 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         >
           <span className="material-symbols-outlined text-[22px]">inventory_2</span>
           <span className="text-[10px] font-medium">Inventario</span>
-        </button>
-
-        {/* Vender (Primary action highlight) */}
-        <button
-          onClick={() => setActiveTab('vender')}
-          className={`flex flex-col items-center justify-center flex-1 gap-1 transition-colors ${
-            activeTab === 'vender' ? 'text-primary font-bold' : 'text-primary/80 hover:text-primary'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[26px] font-bold">add_circle</span>
-          <span className="text-[10px] font-bold">Vender</span>
-        </button>
-
-        {/* Gráficas */}
-        <button
-          onClick={() => setActiveTab('graficas')}
-          className={`flex flex-col items-center justify-center flex-1 gap-1 transition-colors ${
-            activeTab === 'graficas' ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[22px]">monitoring</span>
-          <span className="text-[10px] font-medium">Gráficas</span>
         </button>
 
         {/* Más */}
