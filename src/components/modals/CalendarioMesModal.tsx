@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ImagenZoom } from '../ImagenZoom';
 import { formatMoney, getLocalDateKey } from '../../utils/calculations';
 import { EditRecordHandler } from './EditarRegistroModal';
 
@@ -448,12 +449,7 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <div className="w-8 h-8 rounded-md bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant">
                             {product?.imagen ? (
-                              <img
-                                src={product.imagen}
-                                alt={product.nombre}
-                                className="w-full h-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
+                              <ImagenZoom src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                             ) : (
                               <span className="material-symbols-outlined text-on-surface-variant text-[16px]">
                                 inventory_2

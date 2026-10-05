@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ImagenZoom } from '../ImagenZoom';
 import { Product, PurchaseBatch } from '../../types';
 import {
   formatMoney,
@@ -234,11 +235,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                         >
                           <div className="w-16 h-16 rounded-md bg-surface-container-highest flex-shrink-0 overflow-hidden border border-outline-variant flex items-center justify-center">
                             {p.imagen ? (
-                              <img
-                                src={p.imagen}
-                                alt={p.nombre}
-                                className="w-full h-full object-cover"
-                              />
+                              <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                             ) : (
                               <span className="material-symbols-outlined text-on-surface-variant text-xl">
                                 inventory_2
@@ -332,11 +329,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                         >
                           <div className="w-16 h-16 rounded-md bg-surface-container-highest flex-shrink-0 overflow-hidden border border-outline-variant flex items-center justify-center">
                             {p.imagen ? (
-                              <img
-                                src={p.imagen}
-                                alt={p.nombre}
-                                className="w-full h-full object-cover"
-                              />
+                              <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                             ) : (
                               <span className="material-symbols-outlined text-on-surface-variant text-xl">
                                 inventory_2
@@ -485,12 +478,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant shadow-sm">
                         {product?.imagen ? (
-                          <img
-                            src={product.imagen}
-                            alt={product.nombre}
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
+                          <ImagenZoom src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                         ) : (
                           <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
                             inventory_2
@@ -661,12 +649,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className="w-10 h-10 rounded-lg bg-surface border border-outline-variant flex-shrink-0 flex items-center justify-center overflow-hidden">
                               {prod?.imagen ? (
-                                <img
-                                  src={prod.imagen}
-                                  alt={prod.nombre}
-                                  className="w-full h-full object-cover"
-                                  referrerPolicy="no-referrer"
-                                />
+                                <ImagenZoom src={prod.imagen} alt={prod.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                               ) : (
                                 <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
                                   inventory_2
@@ -783,11 +766,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                       </span>
                     </div>
                     {p.imagen ? (
-                      <img
-                        src={p.imagen}
-                        alt={p.nombre}
-                        className="w-full h-full object-cover grayscale"
-                      />
+                      <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover grayscale" imgClassName="w-full h-full object-cover grayscale" />
                     ) : (
                       <span className="material-symbols-outlined text-on-surface-variant text-xl">
                         inventory_2

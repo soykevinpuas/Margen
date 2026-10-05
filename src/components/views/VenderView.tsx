@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ImagenZoom } from '../ImagenZoom';
 import {
   formatMoney,
   getProductTotalStock,
@@ -437,11 +438,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
               <div className="bg-surface-container border border-outline-variant rounded-xl p-4 flex items-center gap-3 shadow-sm">
                 <div className="w-12 h-12 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center border border-outline-variant overflow-hidden">
                   {selectedProduct.imagen ? (
-                    <img
-                      src={selectedProduct.imagen}
-                      alt={selectedProduct.nombre}
-                      className="w-full h-full object-cover"
-                    />
+                    <ImagenZoom src={selectedProduct.imagen} alt={selectedProduct.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                   ) : (
                     <span className="material-symbols-outlined text-on-surface-variant">
                       inventory_2
@@ -844,12 +841,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant shadow-sm">
                           {product?.imagen ? (
-                            <img
-                              src={product.imagen}
-                              alt={product.nombre}
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
+                            <ImagenZoom src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                           ) : (
                             <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
                               inventory_2
@@ -1052,11 +1044,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
                     >
                       <div className="w-10 h-10 rounded-lg bg-surface flex-shrink-0 flex items-center justify-center overflow-hidden border border-outline-variant">
                         {p.imagen ? (
-                          <img
-                            src={p.imagen}
-                            alt={p.nombre}
-                            className="w-full h-full object-cover"
-                          />
+                          <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                         ) : (
                           <span className="material-symbols-outlined text-on-surface-variant text-[20px]">
                             inventory_2

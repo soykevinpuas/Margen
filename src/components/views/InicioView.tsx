@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ImagenZoom } from '../ImagenZoom';
 import {
   formatMoney,
   getProductTotalStock,
@@ -552,11 +553,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                   >
                     <div className="w-10 h-10 rounded-md bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant flex items-center justify-center">
                       {p.imagen ? (
-                        <img
-                          src={p.imagen}
-                          alt={p.nombre}
-                          className="w-full h-full object-cover grayscale opacity-60"
-                        />
+                        <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover grayscale opacity-60" imgClassName="w-full h-full object-cover grayscale opacity-60" />
                       ) : (
                         <span className="material-symbols-outlined text-on-surface-variant text-lg">
                           inventory_2
@@ -594,11 +591,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                     >
                       <div className="w-10 h-10 rounded-md bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant flex items-center justify-center">
                         {p.imagen ? (
-                          <img
-                            src={p.imagen}
-                            alt={p.nombre}
-                            className="w-full h-full object-cover"
-                          />
+                          <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                         ) : (
                           <span className="material-symbols-outlined text-on-surface-variant text-lg">
                             inventory_2
@@ -667,11 +660,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
                   </div>
                   <div className="w-full aspect-square rounded-md overflow-hidden bg-surface-container-lowest relative border border-outline-variant flex items-center justify-center">
                     {item.product.imagen ? (
-                      <img
-                        src={item.product.imagen}
-                        alt={item.product.nombre}
-                        className="w-full h-full object-cover"
-                      />
+                      <ImagenZoom src={item.product.imagen} alt={item.product.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
                     ) : (
                       <span className="material-symbols-outlined text-on-surface-variant text-2xl">
                         inventory_2

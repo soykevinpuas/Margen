@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ImagenZoom } from '../ImagenZoom';
 import {
   formatMoney,
   getProductTotalStock,
@@ -137,11 +138,7 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
           <div className="flex gap-4 bg-surface-container border border-outline-variant rounded-xl p-3.5">
             <div className="w-20 h-20 rounded-lg bg-surface flex-shrink-0 border border-outline-variant overflow-hidden flex items-center justify-center">
               {product.imagen ? (
-                <img
-                  src={product.imagen}
-                  alt={product.nombre}
-                  className="w-full h-full object-cover"
-                />
+                <ImagenZoom src={product.imagen} alt={product.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
               ) : (
                 <span className="material-symbols-outlined text-on-surface-variant text-2xl">
                   inventory_2
