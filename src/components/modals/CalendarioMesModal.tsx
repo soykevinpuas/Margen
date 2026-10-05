@@ -15,7 +15,7 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { settings, sales, operatingExpenses, batches, products } = useApp();
+  const { settings, sales, operatingExpenses, batches, products, deleteSale } = useApp();
   const { displayCurrency, exchangeRate } = settings;
 
   const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -36,6 +36,18 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
   });
 
   const confirmedSales = sales.filter((s) => s.estado === 'confirmada');
+
+  const handleDeleteSale = (saleId: string) => {
+    if (
+      !confirm(
+        `¿Eliminar la venta ${saleId}? Se restaurará el stock de sus lotes y no se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+    const res = deleteSale(saleId);
+    if (!res.success) alert(res.message);
+  };
 
   // Compute stats for a specific YYYY-MM-DD
   const getDayStats = (dateKey: string) => {
@@ -475,6 +487,14 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                             className="w-6 h-6 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
                           >
                             <span className="material-symbols-outlined text-[14px]">pencil_square</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSale(s.id)}
+                            title="Eliminar venta"
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-error/10 border border-error/40 text-error hover:bg-error/20 transition-all"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">delete</span>
                           </button>
                         </div>
                       </div>

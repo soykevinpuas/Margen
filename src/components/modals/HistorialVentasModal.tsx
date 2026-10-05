@@ -15,7 +15,7 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { settings, sales, products, cancelSale, updateSaleDate } = useApp();
+  const { settings, sales, products, cancelSale, deleteSale, updateSaleDate } = useApp();
   const { displayCurrency, exchangeRate } = settings;
 
   const [search, setSearch] = useState('');
@@ -54,6 +54,21 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
     }, 3000);
   };
 
+  const handleDeleteSale = (saleId: string) => {
+    if (
+      !confirm(
+        `¿Eliminar la venta ${saleId}? Se restaurará el stock de sus lotes y no se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+    const res = deleteSale(saleId);
+    setCancelMessage(res.message);
+    setTimeout(() => {
+      setCancelMessage(null);
+    }, 3000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
       <div className="bg-surface-container-high border border-outline-variant w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
@@ -68,7 +83,7 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
                 Historial de Ventas
               </h2>
               <p className="text-[10px] text-on-surface-variant">
-                Listado completo de ventas y cancelación con restauración de stock
+                Listado completo de ventas: editar, cancelar o eliminar con restauración de stock
               </p>
             </div>
           </div>
@@ -252,6 +267,16 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
                           Anular Venta y Devolver Stock
                         </button>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSale(sale.id)}
+                        title="Eliminar venta"
+                        className="flex items-center gap-1 px-2.5 py-1 bg-error/10 border border-error/40 text-error hover:bg-error/20 font-bold text-[10px] rounded-lg transition-all shrink-0"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">delete</span>
+                        Eliminar
+                      </button>
                     </div>
                   </div>
                 </div>

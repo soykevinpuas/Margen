@@ -95,6 +95,8 @@ interface AppContextType {
     notas?: string;
   }) => { success: boolean; sale?: Sale; message?: string };
   cancelSale: (saleId: string) => { success: boolean; message: string };
+  /** Elimina una venta de forma definitiva y, si estaba confirmada, repone el stock de sus lotes */
+  deleteSale: (saleId: string) => { success: boolean; message: string };
   addOperatingExpense: (expenseData: {
     concepto: string;
     categoria: OperatingExpense['categoria'];
@@ -1115,7 +1117,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (soldUnits > 0) {
       return {
         success: false,
-        message: `Este lote no se puede eliminar completamente porque ya se han vendido ${soldUnits} unidades del mismo.`,
+        message: `Este lote no se puede eliminar porque ya se han vendido ${soldUnits} unidades del mismo. Elimina o anula primero las ventas de ese lote (Historial de Ventas) para liberarlo.`,
       };
     }
 
@@ -1263,6 +1265,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     return { success: true, message: 'Venta cancelada y stock restaurado con éxito.' };
+  };
+
+  /**
+   * Elimina una venta de forma definitiva.
+   * - Si estaba confirmada, repone en cada lote sus unidades (asignacionesLotes) y
+   *   recalcula `locked` (queda desbloqueado cuando ya no queda ninguna unidad vendida).
+   * - `gastosDeVenta` vive embebido dentro del documento de la venta, así que basta
+   *   con borrar la venta (no hay colección de gastos de venta que limpiar).
+   */
+  const deleteSale = (saleId: string): { success: boolean; message: string } => {
+    const sale = sales.find((s) => s.id === saleId);
+    if (!sale) return { success: false, message: 'Venta no encontrada.' };
+
+    if (sale.estado === 'confirmada') {
+      // Otras ventas confirmadas (distintas a la que se borra) que siguen consumiendo cada lote
+      const otherConfirmed = sales.filter((s) => s.id !== saleId && s.estado === 'confirmada');
+
+      const updatedBatches = batches.map((batch) => {
+        const alloc = sale.asignacionesLotes.find((a) => a.loteId === batch.id);
+        if (!alloc) return batch;
+
+        const cantidadDisponible = Math.min(
+          batch.cantidadComprada,
+          batch.cantidadDisponible + alloc.cantidadTomada
+        );
+
+        const stillSoldByOthers = otherConfirmed.some((s) =>
+          s.asignacionesLotes.some((a) => a.loteId === batch.id && a.cantidadTomada > 0)
+        );
+
+        return { ...batch, cantidadDisponible, locked: stillSoldByOthers };
+      });
+
+      setBatches(updatedBatches);
+
+      sale.asignacionesLotes.forEach((alloc) => {
+        const b = updatedBatches.find((x) => x.id === alloc.loteId);
+        if (!b) return;
+        const batchRef = bizDoc('batches', b.id);
+        if (batchRef) safeSetDoc(batchRef, b);
+      });
+    }
+
+    setSales((prev) => prev.filter((s) => s.id !== saleId));
+    const saleRef = bizDoc('sales', saleId);
+    if (saleRef) {
+      deleteDoc(saleRef).catch((err) => console.error('Firestore deleteDoc error:', err));
+    }
+
+    return {
+      success: true,
+      message:
+        sale.estado === 'confirmada'
+          ? `Venta ${saleId} eliminada y stock repuesto en sus lotes.`
+          : `Venta ${saleId} eliminada.`,
+    };
   };
 
   const updateSaleDate = (saleId: string, newFecha: string) => {
@@ -1574,6 +1632,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deletePurchaseBatch,
         addSale,
         cancelSale,
+        deleteSale,
         updateSaleDate,
         updateBatchDate,
         updateSale,

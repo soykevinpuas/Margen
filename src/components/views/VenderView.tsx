@@ -28,7 +28,8 @@ export const VenderView: React.FC<VenderViewProps> = ({
   onCloseVender,
   onEdit,
 }) => {
-  const { settings, products, batches, sales, addSale, cancelSale, updateSaleDate } = useApp();
+  const { settings, products, batches, sales, addSale, cancelSale, deleteSale, updateSaleDate } =
+    useApp();
   const { displayCurrency, exchangeRate } = settings;
 
   const [activeTab, setActiveTab] = useState<'registrar' | 'historial'>('registrar');
@@ -357,6 +358,21 @@ export const VenderView: React.FC<VenderViewProps> = ({
     const res = cancelSale(saleId);
     setCancelMessage(res.message);
     setCancellingSaleId(null);
+    setTimeout(() => {
+      setCancelMessage(null);
+    }, 3000);
+  };
+
+  const handleDeleteSaleInTab = (saleId: string) => {
+    if (
+      !confirm(
+        `¿Eliminar la venta ${saleId}? Se restaurará el stock de sus lotes y no se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+    const res = deleteSale(saleId);
+    setCancelMessage(res.message);
     setTimeout(() => {
       setCancelMessage(null);
     }, 3000);
@@ -919,7 +935,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
                         />
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => onEdit && onEdit('venta', sale)}
@@ -939,6 +955,16 @@ export const VenderView: React.FC<VenderViewProps> = ({
                             Anular Venta y Devolver Stock
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSaleInTab(sale.id)}
+                          title="Eliminar venta"
+                          className="px-2.5 py-1 bg-error/10 border border-error/40 text-error hover:bg-error/20 font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">delete</span>
+                          Eliminar
+                        </button>
                       </div>
                     </div>
                   </div>

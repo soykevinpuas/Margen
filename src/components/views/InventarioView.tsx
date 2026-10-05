@@ -34,6 +34,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
     sales,
     updateBatchDate,
     deletePurchaseBatch,
+    deleteSale,
   } = useApp();
   const { displayCurrency, exchangeRate } = settings;
 
@@ -48,6 +49,18 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
         alert(res.message);
       }
     }
+  };
+
+  const handleDeleteSale = (saleId: string) => {
+    if (
+      !confirm(
+        `¿Eliminar la venta ${saleId}? Se restaurará el stock de sus lotes y no se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+    const res = deleteSale(saleId);
+    if (!res.success) alert(res.message);
   };
 
   // Filter products
@@ -698,7 +711,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex justify-end pt-1.5 border-t border-outline-variant/20">
+                        <div className="flex justify-end gap-1.5 pt-1.5 border-t border-outline-variant/20">
                           <button
                             type="button"
                             onClick={() => onEdit('venta', s)}
@@ -707,6 +720,15 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                           >
                             <span className="material-symbols-outlined text-[13px]">pencil_square</span>
                             Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSale(s.id)}
+                            title="Eliminar venta"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-error/10 border border-error/40 text-error text-[10px] font-bold hover:bg-error/20 transition-all"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">delete</span>
+                            Eliminar
                           </button>
                         </div>
                       </div>
