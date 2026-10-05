@@ -8,6 +8,7 @@ import {
 } from '../../utils/calculations';
 import { Product, SaleExpenseItem } from '../../types';
 import { TicketModal } from '../modals/TicketModal';
+import { EditRecordHandler } from '../modals/EditarRegistroModal';
 
 interface VenderViewProps {
   preselectedProductId?: string | null;
@@ -15,6 +16,8 @@ interface VenderViewProps {
   onGoToHistory: () => void;
   onOpenNuevoProducto?: () => void;
   onCloseVender?: () => void;
+  /** Abre el modal EditarRegistroModal con la venta seleccionada */
+  onEdit?: EditRecordHandler;
 }
 
 export const VenderView: React.FC<VenderViewProps> = ({
@@ -23,6 +26,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
   onGoToHistory,
   onOpenNuevoProducto,
   onCloseVender,
+  onEdit,
 }) => {
   const { settings, products, batches, sales, addSale, cancelSale, updateSaleDate } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -899,32 +903,44 @@ export const VenderView: React.FC<VenderViewProps> = ({
                       </p>
                     )}
 
-                    {!isCancelled && (
-                      <div className="pt-2 border-t border-outline-variant/20 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant/60 rounded-lg px-2 py-1 text-[10px]">
-                          <span className="material-symbols-outlined text-[14px] text-primary">edit_calendar</span>
-                          <span className="font-bold text-on-surface-variant">Fecha:</span>
-                          <input
-                            type="date"
-                            value={getLocalDateKey(sale.fecha)}
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                updateSaleDate(sale.id, e.target.value);
-                              }
-                            }}
-                            className="bg-transparent font-bold text-primary focus:outline-none cursor-pointer text-[10px]"
-                          />
-                        </div>
-
-                        <button
-                          onClick={() => setCancellingSaleId(sale.id)}
-                          className="px-2.5 py-1 bg-error/10 border border-error/30 text-error hover:bg-error/20 font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 shrink-0"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">cancel</span>
-                          Anular Venta y Devolver Stock
-                        </button>
+                    <div className="pt-2 border-t border-outline-variant/20 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant/60 rounded-lg px-2 py-1 text-[10px]">
+                        <span className="material-symbols-outlined text-[14px] text-primary">edit_calendar</span>
+                        <span className="font-bold text-on-surface-variant">Fecha:</span>
+                        <input
+                          type="date"
+                          value={getLocalDateKey(sale.fecha)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              updateSaleDate(sale.id, e.target.value);
+                            }
+                          }}
+                          className="bg-transparent font-bold text-primary focus:outline-none cursor-pointer text-[10px]"
+                        />
                       </div>
-                    )}
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onEdit && onEdit('venta', sale)}
+                          title="Editar venta"
+                          className="px-2.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">pencil_square</span>
+                          Editar
+                        </button>
+
+                        {!isCancelled && (
+                          <button
+                            onClick={() => setCancellingSaleId(sale.id)}
+                            className="px-2.5 py-1 bg-error/10 border border-error/30 text-error hover:bg-error/20 font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 shrink-0"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">cancel</span>
+                            Anular Venta y Devolver Stock
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               })}

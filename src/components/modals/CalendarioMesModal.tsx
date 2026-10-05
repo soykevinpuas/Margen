@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatMoney, getLocalDateKey } from '../../utils/calculations';
+import { EditRecordHandler } from './EditarRegistroModal';
 
 interface CalendarioMesModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Abre el modal EditarRegistroModal con la venta o el gasto del día */
+  onEdit: EditRecordHandler;
 }
 
 export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
   isOpen,
   onClose,
+  onEdit,
 }) => {
   const { settings, sales, operatingExpenses, batches, products } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -460,9 +464,19 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                             )}
                           </div>
                         </div>
-                        <span className="font-bold text-emerald-400 text-xs shrink-0">
-                          +{formatMoney(s.ingresoTotalMXN, displayCurrency, exchangeRate)}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-bold text-emerald-400 text-xs">
+                            +{formatMoney(s.ingresoTotalMXN, displayCurrency, exchangeRate)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onEdit('venta', s)}
+                            title="Editar venta"
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">pencil_square</span>
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -479,8 +493,18 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                     >
                       <div className="flex justify-between items-center gap-2">
                         <span className="min-w-0 truncate">{e.concepto}</span>
-                        <span className="font-bold text-rose-400 shrink-0">
-                          -{formatMoney(e.montoMXN, displayCurrency, exchangeRate)}
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-bold text-rose-400">
+                            -{formatMoney(e.montoMXN, displayCurrency, exchangeRate)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onEdit('gasto', e)}
+                            title="Editar gasto"
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">pencil_square</span>
+                          </button>
                         </span>
                       </div>
                       {e.notas && (

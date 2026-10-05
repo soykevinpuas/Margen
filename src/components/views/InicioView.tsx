@@ -9,6 +9,7 @@ import {
   MetricPeriod,
 } from '../../utils/calculations';
 import { CalendarioMesModal } from '../modals/CalendarioMesModal';
+import { EditRecordHandler } from '../modals/EditarRegistroModal';
 
 interface InicioViewProps {
   onNavigateTab: (tab: 'inicio' | 'inventario' | 'mas') => void;
@@ -18,6 +19,8 @@ interface InicioViewProps {
   onOpenCompra: (productId?: string | null) => void;
   onOpenGasto: () => void;
   onSelectProduct: (productId: string) => void;
+  /** Abre el modal EditarRegistroModal desde el calendario mensual */
+  onEdit: EditRecordHandler;
 }
 
 /** Orden de rotación automática de las temporalidades del dashboard */
@@ -81,6 +84,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
   onOpenCompra,
   onOpenGasto,
   onSelectProduct,
+  onEdit,
 }) => {
   const { settings, products, batches, sales, operatingExpenses } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -589,6 +593,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
       <CalendarioMesModal
         isOpen={isCalendarioOpen}
         onClose={() => setIsCalendarioOpen(false)}
+        onEdit={onEdit}
       />
     </div>
   );

@@ -22,6 +22,12 @@ import { AjusteInventarioModal } from './components/modals/AjusteInventarioModal
 import { NuevoProductoModal } from './components/modals/NuevoProductoModal';
 import { ConfiguracionModal } from './components/modals/ConfiguracionModal';
 import { AuthModal } from './components/modals/AuthModal';
+import {
+  EditarRegistroModal,
+  EditRecordHandler,
+  EditableRecord,
+  EditableRecordType,
+} from './components/modals/EditarRegistroModal';
 
 export const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -46,6 +52,19 @@ export const AppContent: React.FC = () => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [preselectedProductForSale, setPreselectedProductForSale] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+
+  // Edición genérica de registros (venta / lote / gasto) desde cualquier card de historial
+  const [editState, setEditState] = useState<{
+    open: boolean;
+    type: EditableRecordType;
+    recordId: string;
+    record: EditableRecord | null;
+  }>({ open: false, type: 'venta', recordId: '', record: null });
+
+  /** Monta el modal EditarRegistroModal con el registro seleccionado */
+  const editRecord: EditRecordHandler = (type, record) => {
+    setEditState({ open: true, type, recordId: record.id, record });
+  };
 
   const tabTitles: Record<TabType, string> = {
     inicio: 'Inicio',
@@ -159,6 +178,7 @@ export const AppContent: React.FC = () => {
               onOpenCompra={(pid) => { setPreselectedCompraProduct(pid ?? null); setIsCompraOpen(true); }}
               onOpenGasto={() => setIsGastoOpen(true)}
               onSelectProduct={handleSelectProduct}
+              onEdit={editRecord}
             />
           )}
 
@@ -171,6 +191,7 @@ export const AppContent: React.FC = () => {
               }}
               onOpenCompra={(pid) => { setPreselectedCompraProduct(pid ?? null); setIsCompraOpen(true); }}
               onOpenVender={(pid) => handleOpenVenderConProducto(pid)}
+              onEdit={editRecord}
             />
           )}
 
@@ -202,6 +223,7 @@ export const AppContent: React.FC = () => {
                   setOverlayView(null);
                   setPreselectedProductForSale(null);
                 }}
+                onEdit={editRecord}
               />
             </div>
           )}
@@ -232,6 +254,7 @@ export const AppContent: React.FC = () => {
               onOpenAjusteInventario={() => setIsAjusteInventarioOpen(true)}
               onOpenConfiguracion={() => setIsConfiguracionOpen(true)}
               onOpenGraficas={() => setOverlayView('graficas')}
+              onEdit={editRecord}
             />
           )}
         </main>
@@ -269,21 +292,25 @@ export const AppContent: React.FC = () => {
       <HistorialVentasModal
         isOpen={isHistorialVentasOpen}
         onClose={() => setIsHistorialVentasOpen(false)}
+        onEdit={editRecord}
       />
 
       <HistorialComprasModal
         isOpen={isHistorialComprasOpen}
         onClose={() => setIsHistorialComprasOpen(false)}
+        onEdit={editRecord}
       />
 
       <GastosOperativosModal
         isOpen={isGastosOperativosOpen}
         onClose={() => setIsGastosOperativosOpen(false)}
+        onEdit={editRecord}
       />
 
       <GastoHistoricoModal
         isOpen={isGastoHistoricoOpen}
         onClose={() => setIsGastoHistoricoOpen(false)}
+        onEdit={editRecord}
       />
 
       <AjusteInventarioModal
@@ -309,6 +336,15 @@ export const AppContent: React.FC = () => {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
+      />
+
+      {/* Edición genérica de registros (venta / lote / gasto) */}
+      <EditarRegistroModal
+        isOpen={editState.open}
+        type={editState.type}
+        record={editState.record}
+        recordId={editState.recordId}
+        onClose={() => setEditState((prev) => ({ ...prev, open: false }))}
       />
     </div>
   );

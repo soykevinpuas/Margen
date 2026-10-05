@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatMoney } from '../../utils/calculations';
+import { EditRecordHandler } from './EditarRegistroModal';
 
 interface GastosOperativosModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Abre el modal EditarRegistroModal con el gasto seleccionado */
+  onEdit: EditRecordHandler;
 }
 
 export const GastosOperativosModal: React.FC<GastosOperativosModalProps> = ({
   isOpen,
   onClose,
+  onEdit,
 }) => {
   const { settings, operatingExpenses } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -103,8 +107,18 @@ export const GastosOperativosModal: React.FC<GastosOperativosModalProps> = ({
                   )}
                 </div>
 
-                <div className="text-right font-bold text-error text-sm">
-                  -{formatMoney(exp.montoMXN, displayCurrency, exchangeRate)}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right font-bold text-error text-sm">
+                    -{formatMoney(exp.montoMXN, displayCurrency, exchangeRate)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onEdit('gasto', exp)}
+                    title="Editar gasto"
+                    className="w-8 h-8 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">pencil_square</span>
+                  </button>
                 </div>
               </div>
             ))

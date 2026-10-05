@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatMoney } from '../../utils/calculations';
+import { OperatingExpense } from '../../types';
+import { EditRecordHandler } from './EditarRegistroModal';
 
 interface GastoHistoricoModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Abre el modal EditarRegistroModal con el gasto operativo seleccionado */
+  onEdit: EditRecordHandler;
 }
 
 export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
   isOpen,
   onClose,
+  onEdit,
 }) => {
   const { settings, sales, operatingExpenses, batches } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -46,6 +51,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
     notas: e.notas,
     tag: 'Gasto Operativo',
     color: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
+    raw: e as OperatingExpense | null,
   }));
 
   const salesCogsList = confirmedSales.map((s) => ({
@@ -58,6 +64,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
     notas: s.notas,
     tag: 'Mercancía Vendida',
     color: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+    raw: null as OperatingExpense | null,
   }));
 
   const batchExpList = batches.flatMap((b) =>
@@ -71,6 +78,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
       notas: b.notas,
       tag: 'Gasto de Compra',
       color: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
+      raw: null as OperatingExpense | null,
     }))
   );
 
@@ -234,10 +242,22 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
                   )}
                 </div>
 
-                <div className="text-right">
-                  <span className="font-mono font-bold text-rose-400 text-xs">
-                    -{formatMoney(item.montoMXN, displayCurrency, exchangeRate)}
-                  </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-rose-400 text-xs">
+                      -{formatMoney(item.montoMXN, displayCurrency, exchangeRate)}
+                    </span>
+                  </div>
+                  {item.raw && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit('gasto', item.raw)}
+                      title="Editar gasto"
+                      className="w-8 h-8 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">pencil_square</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ))

@@ -113,6 +113,21 @@ interface AppContextType {
   }) => { success: boolean; message: string };
   updateSaleDate: (saleId: string, newFecha: string) => void;
   updateBatchDate: (batchId: string, newFecha: string) => void;
+  /** Edita campos de una venta y recalcula ingreso, ganancia y margen */
+  updateSale: (
+    saleId: string,
+    patch: Partial<Pick<Sale, 'cantidad' | 'precioVentaUnitarioMXN' | 'notas' | 'fecha'>>
+  ) => void;
+  /** Edita campos de un gasto operativo y lo persiste */
+  updateOperatingExpense: (
+    id: string,
+    patch: Partial<
+      Pick<
+        OperatingExpense,
+        'concepto' | 'categoria' | 'montoMXN' | 'fecha' | 'notas' | 'esRecurrente'
+      >
+    >
+  ) => void;
   resetToSeedData: () => void;
   clearAllData: () => Promise<void>;
 }
@@ -1268,6 +1283,141 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (ref) safeSetDoc(ref, updatedBatch);
   };
 
+  const updateSale = (
+    saleId: string,
+    patch: Partial<Pick<Sale, 'cantidad' | 'precioVentaUnitarioMXN' | 'notas' | 'fecha'>>
+  ) => {
+    const existing = sales.find((s) => s.id === saleId);
+    if (!existing) return;
+
+    const precioVentaUnitarioMXN =
+      patch.precioVentaUnitarioMXN !== undefined && Number.isFinite(patch.precioVentaUnitarioMXN)
+        ? Math.max(0, patch.precioVentaUnitarioMXN)
+        : existing.precioVentaUnitarioMXN;
+    const notas = patch.notas !== undefined ? patch.notas : existing.notas;
+    const fecha = patch.fecha && patch.fecha.trim() !== '' ? patch.fecha : existing.fecha;
+
+    const requestedQty =
+      patch.cantidad !== undefined && Number.isFinite(patch.cantidad)
+        ? Math.max(1, Math.floor(patch.cantidad))
+        : null;
+
+    let cantidad = existing.cantidad;
+    let asignacionesLotes = existing.asignacionesLotes;
+    let costoUnidadesVendidasMXN = existing.costoUnidadesVendidasMXN;
+    let metodoAsignacion = existing.metodoAsignacion;
+    let nextBatches: PurchaseBatch[] | null = null;
+
+    // Si cambió la cantidad de una venta confirmada hay que rehacer el stock:
+    // 1) devolver al lote sus unidades asignadas, 2) reasignar por FIFO,
+    // 3) volver a descontar del stock. Si no hay stock suficiente se ajusta
+    // a lo disponible (igual que al registrar la venta).
+    if (requestedQty !== null && requestedQty !== existing.cantidad) {
+      if (existing.estado === 'confirmada') {
+        const restored = batches.map((batch) => {
+          const alloc = existing.asignacionesLotes.find((a) => a.loteId === batch.id);
+          if (!alloc) return batch;
+          return {
+            ...batch,
+            cantidadDisponible: Math.max(
+              0,
+              batch.cantidadDisponible + alloc.cantidadTomada
+            ),
+          };
+        });
+
+        const fifo = calculateFifoAllocation(existing.productoId, requestedQty, restored);
+        if (fifo.allocatedQuantity > 0) {
+          cantidad = fifo.allocatedQuantity;
+          asignacionesLotes = fifo.allocations;
+          costoUnidadesVendidasMXN = fifo.cogsMXN;
+          metodoAsignacion = 'FIFO';
+          nextBatches = restored.map((batch) => {
+            const alloc = fifo.allocations.find((a) => a.loteId === batch.id);
+            if (!alloc) return batch;
+            return {
+              ...batch,
+              cantidadDisponible: Math.max(0, batch.cantidadDisponible - alloc.cantidadTomada),
+              locked: true,
+            };
+          });
+        }
+      } else {
+        // Venta cancelada: su stock ya fue devuelto, no se mueve inventario.
+        cantidad = requestedQty;
+      }
+    }
+
+    const ingresoTotalMXN = cantidad * precioVentaUnitarioMXN;
+    const gastosDeVentaTotalMXN = (existing.gastosDeVenta || []).reduce(
+      (acc, g) => acc + (g.montoMXN || 0),
+      0
+    );
+    const gananciaVentaMXN = ingresoTotalMXN - costoUnidadesVendidasMXN - gastosDeVentaTotalMXN;
+    const margenPorcentaje = ingresoTotalMXN > 0 ? (gananciaVentaMXN / ingresoTotalMXN) * 100 : 0;
+
+    const updatedSale: Sale = {
+      ...existing,
+      cantidad,
+      precioVentaUnitarioMXN,
+      notas,
+      fecha,
+      asignacionesLotes,
+      costoUnidadesVendidasMXN,
+      metodoAsignacion,
+      ingresoTotalMXN,
+      gastosDeVentaTotalMXN,
+      gananciaVentaMXN,
+      margenPorcentaje,
+    };
+
+    setSales((prev) => prev.map((s) => (s.id === saleId ? updatedSale : s)));
+    const ref = bizDoc('sales', saleId);
+    if (ref) safeSetDoc(ref, updatedSale);
+
+    if (nextBatches) {
+      const finalBatches = nextBatches;
+      setBatches(finalBatches);
+      const touchedIds = new Set([
+        ...existing.asignacionesLotes.map((a) => a.loteId),
+        ...asignacionesLotes.map((a) => a.loteId),
+      ]);
+      touchedIds.forEach((id) => {
+        const b = finalBatches.find((x) => x.id === id);
+        if (!b) return;
+        const batchRef = bizDoc('batches', id);
+        if (batchRef) safeSetDoc(batchRef, b);
+      });
+    }
+  };
+
+  const updateOperatingExpense = (
+    id: string,
+    patch: Partial<
+      Pick<
+        OperatingExpense,
+        'concepto' | 'categoria' | 'montoMXN' | 'fecha' | 'notas' | 'esRecurrente'
+      >
+    >
+  ) => {
+    const existing = operatingExpenses.find((e) => e.id === id);
+    if (!existing) return;
+
+    const updated: OperatingExpense = { ...existing };
+    if (patch.concepto !== undefined) updated.concepto = patch.concepto;
+    if (patch.categoria !== undefined) updated.categoria = patch.categoria;
+    if (patch.montoMXN !== undefined && Number.isFinite(patch.montoMXN)) {
+      updated.montoMXN = Math.max(0, patch.montoMXN);
+    }
+    if (patch.fecha !== undefined && patch.fecha.trim() !== '') updated.fecha = patch.fecha;
+    if (patch.notas !== undefined) updated.notas = patch.notas;
+    if (patch.esRecurrente !== undefined) updated.esRecurrente = patch.esRecurrente;
+
+    setOperatingExpenses((prev) => prev.map((e) => (e.id === id ? updated : e)));
+    const ref = bizDoc('expenses', id);
+    if (ref) safeSetDoc(ref, updated);
+  };
+
   const addOperatingExpense = (expenseData: {
     concepto: string;
     categoria: OperatingExpense['categoria'];
@@ -1426,6 +1576,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cancelSale,
         updateSaleDate,
         updateBatchDate,
+        updateSale,
+        updateOperatingExpense,
         addOperatingExpense,
         addInventoryAdjustment,
         resetToSeedData,

@@ -4,6 +4,7 @@ import { ExportExcelModal } from '../modals/ExportExcelModal';
 import { GastoHistoricoModal } from '../modals/GastoHistoricoModal';
 import { GananciasHistoricasModal } from '../modals/GananciasHistoricasModal';
 import { CompartirAmigoModal } from '../modals/CompartirAmigoModal';
+import { EditRecordHandler } from '../modals/EditarRegistroModal';
 
 interface MasViewProps {
   onOpenCompra: (productId?: string | null) => void;
@@ -17,6 +18,8 @@ interface MasViewProps {
   onOpenGastoHistorico?: () => void;
   onOpenGananciasHistoricas?: () => void;
   onOpenGraficas?: () => void;
+  /** Abre el modal EditarRegistroModal desde el Gasto Histórico */
+  onEdit: EditRecordHandler;
 }
 
 export const MasView: React.FC<MasViewProps> = ({
@@ -31,6 +34,7 @@ export const MasView: React.FC<MasViewProps> = ({
   onOpenGastoHistorico,
   onOpenGananciasHistoricas,
   onOpenGraficas,
+  onEdit,
 }) => {
   const { settings } = useApp();
   const [isExcelOpen, setIsExcelOpen] = useState(false);
@@ -357,6 +361,7 @@ export const MasView: React.FC<MasViewProps> = ({
       <GastoHistoricoModal
         isOpen={isGastoHistoricoOpen}
         onClose={() => setIsGastoHistoricoOpen(false)}
+        onEdit={onEdit}
       />
 
       <GananciasHistoricasModal

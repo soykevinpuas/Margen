@@ -7,6 +7,7 @@ import {
   getProductBadges,
   getLocalDateKey,
 } from '../../utils/calculations';
+import { EditRecordHandler } from '../modals/EditarRegistroModal';
 
 interface InventarioViewProps {
   onSelectProduct: (productId: string) => void;
@@ -14,6 +15,8 @@ interface InventarioViewProps {
   onOpenCompra: (productId?: string | null) => void;
   /** Abre el overlay de Venta con ese producto preseleccionado */
   onOpenVender: (productId: string) => void;
+  /** Abre el modal EditarRegistroModal con la venta o el lote seleccionado */
+  onEdit: EditRecordHandler;
 }
 
 export const InventarioView: React.FC<InventarioViewProps> = ({
@@ -21,6 +24,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
   onOpenNuevoProducto,
   onOpenCompra,
   onOpenVender,
+  onEdit,
 }) => {
   const {
     settings,
@@ -29,7 +33,6 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
     batches,
     sales,
     updateBatchDate,
-    updatePurchaseBatch,
     deletePurchaseBatch,
   } = useApp();
   const { displayCurrency, exchangeRate } = settings;
@@ -37,39 +40,6 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'productos' | 'compras' | 'agotados'>('productos');
   const [historialSub, setHistorialSub] = useState<'compras' | 'ventas'>('compras');
-
-  // Editing batch state
-  const [editingBatch, setEditingBatch] = useState<PurchaseBatch | null>(null);
-  const [editQty, setEditQty] = useState<number>(1);
-  const [editCostUnit, setEditCostUnit] = useState<number>(0);
-  const [editProveedor, setEditProveedor] = useState<string>('');
-  const [editFecha, setEditFecha] = useState<string>('');
-  const [batchError, setBatchError] = useState<string>('');
-
-  const handleStartEdit = (batch: PurchaseBatch) => {
-    setEditingBatch(batch);
-    setEditQty(batch.cantidadComprada);
-    setEditCostUnit(batch.costoProductoUnitarioMXN);
-    setEditProveedor(batch.proveedor || '');
-    setEditFecha(getLocalDateKey(batch.fecha));
-    setBatchError('');
-  };
-
-  const handleSaveEdit = () => {
-    if (!editingBatch) return;
-    const soldUnits = editingBatch.cantidadComprada - editingBatch.cantidadDisponible;
-    if (editQty < soldUnits) {
-      setBatchError(`No puedes reducir la cantidad por debajo de ${soldUnits} unidades ya vendidas.`);
-      return;
-    }
-    updatePurchaseBatch(editingBatch.id, {
-      cantidadComprada: Number(editQty),
-      costoProductoUnitarioMXN: Number(editCostUnit),
-      proveedor: editProveedor,
-      fecha: editFecha,
-    });
-    setEditingBatch(null);
-  };
 
   const handleDeleteBatch = (batch: PurchaseBatch) => {
     if (confirm(`¿Estás seguro de que deseas eliminar el Lote ${batch.id}?`)) {
@@ -564,161 +534,70 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                     </div>
                   </div>
 
-                  {editingBatch?.id !== batch.id ? (
-                    <>
-                      <div className="bg-surface-container-lowest rounded-lg p-2 text-[10px] text-on-surface-variant flex justify-between border border-outline-variant/20">
-                        <span>
-                          Unit. Base:{' '}
-                          {formatMoney(
-                            batch.costoProductoUnitarioMXN,
-                            displayCurrency,
-                            exchangeRate
-                          )}
-                        </span>
-                        <span>
-                          Gastos:{' '}
-                          {formatMoney(
-                            batch.gastosDeCompra.reduce((a, g) => a + g.montoMXN, 0),
-                            displayCurrency,
-                            exchangeRate
-                          )}
-                        </span>
-                        <span className="font-bold text-on-surface">
-                          Total Lote:{' '}
-                          {formatMoney(batch.costoTotalMXN, displayCurrency, exchangeRate)}
-                        </span>
+                  <>
+                    <div className="bg-surface-container-lowest rounded-lg p-2 text-[10px] text-on-surface-variant flex justify-between border border-outline-variant/20">
+                      <span>
+                        Unit. Base:{' '}
+                        {formatMoney(
+                          batch.costoProductoUnitarioMXN,
+                          displayCurrency,
+                          exchangeRate
+                        )}
+                      </span>
+                      <span>
+                        Gastos:{' '}
+                        {formatMoney(
+                          batch.gastosDeCompra.reduce((a, g) => a + g.montoMXN, 0),
+                          displayCurrency,
+                          exchangeRate
+                        )}
+                      </span>
+                      <span className="font-bold text-on-surface">
+                        Total Lote:{' '}
+                        {formatMoney(batch.costoTotalMXN, displayCurrency, exchangeRate)}
+                      </span>
+                    </div>
+
+                    {/* Editable Batch Date & Action Buttons */}
+                    <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20 gap-2">
+                      <div className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant/60 rounded-lg px-2 py-1 text-[10px]">
+                        <span className="material-symbols-outlined text-[14px] text-primary">edit_calendar</span>
+                        <span className="font-bold text-on-surface-variant">Fecha:</span>
+                        <input
+                          type="date"
+                          value={getLocalDateKey(batch.fecha)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              updateBatchDate(batch.id, e.target.value);
+                            }
+                          }}
+                          className="bg-transparent font-bold text-primary focus:outline-none cursor-pointer text-[10px]"
+                        />
                       </div>
 
-                      {/* Editable Batch Date & Action Buttons */}
-                      <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20 gap-2">
-                        <div className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant/60 rounded-lg px-2 py-1 text-[10px]">
-                          <span className="material-symbols-outlined text-[14px] text-primary">edit_calendar</span>
-                          <span className="font-bold text-on-surface-variant">Fecha:</span>
-                          <input
-                            type="date"
-                            value={getLocalDateKey(batch.fecha)}
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                updateBatchDate(batch.id, e.target.value);
-                              }
-                            }}
-                            className="bg-transparent font-bold text-primary focus:outline-none cursor-pointer text-[10px]"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(batch)}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all"
-                          >
-                            <span className="material-symbols-outlined text-[13px]">edit</span>
-                            Editar Lote
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteBatch(batch)}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold hover:bg-rose-500/20 transition-all"
-                            title="Eliminar lote"
-                          >
-                            <span className="material-symbols-outlined text-[13px]">delete</span>
-                            Eliminar
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    /* Inline Edit Mode Form */
-                    <div className="bg-surface-container-high p-3 rounded-xl border border-primary/40 space-y-2.5 mt-2 animate-fade-in">
-                      <div className="flex justify-between items-center text-xs font-bold text-primary">
-                        <span>Editar Lote #{batch.id}</span>
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setEditingBatch(null)}
-                          className="text-on-surface-variant hover:text-on-surface text-xs"
+                          onClick={() => onEdit('lote', batch)}
+                          title="Editar lote"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all"
                         >
-                          Cancelar
+                          <span className="material-symbols-outlined text-[13px]">pencil_square</span>
+                          Editar
                         </button>
-                      </div>
 
-                      {batchError && (
-                        <div className="p-2 rounded bg-error/10 border border-error/30 text-error text-[10px] font-bold">
-                          {batchError}
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div>
-                          <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">
-                            Cant. Comprada:
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={editQty}
-                            onChange={(e) => setEditQty(Number(e.target.value))}
-                            className="w-full bg-surface-container border border-outline-variant rounded p-1.5 text-on-surface font-bold text-xs"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">
-                            Costo Unit. (MXN):
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={editCostUnit}
-                            onChange={(e) => setEditCostUnit(Number(e.target.value))}
-                            className="w-full bg-surface-container border border-outline-variant rounded p-1.5 text-on-surface font-bold text-xs"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">
-                            Proveedor:
-                          </label>
-                          <input
-                            type="text"
-                            value={editProveedor}
-                            onChange={(e) => setEditProveedor(e.target.value)}
-                            className="w-full bg-surface-container border border-outline-variant rounded p-1.5 text-on-surface text-xs"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">
-                            Fecha Compra:
-                          </label>
-                          <input
-                            type="date"
-                            value={editFecha}
-                            onChange={(e) => setEditFecha(e.target.value)}
-                            className="w-full bg-surface-container border border-outline-variant rounded p-1.5 text-on-surface font-bold text-xs"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-1">
                         <button
                           type="button"
-                          onClick={() => setEditingBatch(null)}
-                          className="px-3 py-1.5 rounded-lg bg-surface-container text-on-surface-variant text-[11px] font-bold"
+                          onClick={() => handleDeleteBatch(batch)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold hover:bg-rose-500/20 transition-all"
+                          title="Eliminar lote"
                         >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSaveEdit}
-                          className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-[11px] font-bold shadow-sm"
-                        >
-                          Guardar Cambios
+                          <span className="material-symbols-outlined text-[13px]">delete</span>
+                          Eliminar
                         </button>
                       </div>
                     </div>
-                  )}
+                  </>
                 </div>
               );
             })
@@ -817,6 +696,18 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                               Ganancia: {formatMoney(s.gananciaVentaMXN, displayCurrency, exchangeRate)}
                             </div>
                           </div>
+                        </div>
+
+                        <div className="flex justify-end pt-1.5 border-t border-outline-variant/20">
+                          <button
+                            type="button"
+                            onClick={() => onEdit('venta', s)}
+                            title="Editar venta"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">pencil_square</span>
+                            Editar
+                          </button>
                         </div>
                       </div>
                     );
