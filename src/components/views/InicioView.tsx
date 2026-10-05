@@ -100,6 +100,7 @@ export const InicioView: React.FC<InicioViewProps> = ({
 
   // Toggle: card "Resumen financiero" <-> gráfica (en la misma posición)
   const [showChart, setShowChart] = useState(false);
+  const [chartSelectedIndex, setChartSelectedIndex] = useState<number | null>(null);
 
   // Temporalidad del dashboard KPI (rota automáticamente cada 5s)
   const [periodIndex, setPeriodIndex] = useState(0);
@@ -246,23 +247,13 @@ export const InicioView: React.FC<InicioViewProps> = ({
           </div>
         </div>
 
-        {/* Toggle: click en la tarjeta (o en la gráfica) alterna entre ambas vistas */}
-        <div
-          onClick={() => setShowChart((v) => !v)}
-          className={`grid cursor-pointer select-none transition-[grid-template-rows] duration-300 ease-out ${
-            showChart ? 'grid-rows-[0fr_1fr]' : 'grid-rows-[1fr_0fr]'
-          }`}
-        >
-          {/* Panel A: Resumen Financiero (3 KPIs) */}
-          <div
-            className={`overflow-hidden min-h-0 transition-opacity duration-300 ${
-              showChart ? 'opacity-0 pointer-events-none' : 'opacity-100'
-            }`}
+        {/* Toggle entre la card Resumen Financiero y la gráfica */}
+        {!showChart ? (
+          <section
+            key="resumen-visible"
+            className="bg-surface-container rounded-xl border border-outline-variant shadow-sm overflow-hidden animate-fade-in cursor-pointer"
+            onClick={() => setShowChart(true)}
           >
-            <section
-              key={showChart ? 'resumen-oculto' : 'resumen-visible'}
-              className="bg-surface-container rounded-xl border border-outline-variant shadow-sm overflow-hidden animate-fade-in"
-            >
               {/* Header: título + chip de temporalidad activa */}
               <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-2.5">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -413,61 +404,56 @@ export const InicioView: React.FC<InicioViewProps> = ({
                   </span>
                 </button>
               </div>
-            </section>
-          </div>
-
-          {/* Panel B: Gráfica (misma posición, click para volver) */}
-          <div
-            className={`overflow-hidden min-h-0 transition-opacity duration-300 ${
-              showChart ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
+          </section>
+        ) : (
+          <section
+            key="grafica-visible"
+            onClick={() => setShowChart(false)}
+            className="bg-surface-container rounded-xl border border-outline-variant shadow-sm overflow-hidden animate-fade-in cursor-pointer"
           >
-            <section
-              key={showChart ? 'grafica-visible' : 'grafica-oculta'}
-              className="bg-surface-container rounded-xl border border-outline-variant shadow-sm overflow-hidden animate-fade-in"
-            >
-              {/* Header en modo gráfica */}
-              <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-2.5 border-b border-outline-variant/40">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="material-symbols-outlined text-[15px] text-primary">
-                    monitoring
-                  </span>
-                  <h1 className="text-[10px] font-extrabold uppercase tracking-wider text-on-surface-variant truncate">
-                    Gráfica · últimos 7 días
-                  </h1>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowChart(false);
-                  }}
-                  className="flex items-center gap-0.5 shrink-0 text-[10px] font-bold text-primary hover:underline"
-                >
-                  <span className="material-symbols-outlined text-[13px]">arrow_back</span>
-                  Volver al resumen
-                </button>
+            {/* Header en modo gráfica */}
+            <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-2.5 border-b border-outline-variant/40">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="material-symbols-outlined text-[15px] text-primary">
+                  monitoring
+                </span>
+                <h1 className="text-[10px] font-extrabold uppercase tracking-wider text-on-surface-variant truncate">
+                  Gráfica · últimos 7 días
+                </h1>
               </div>
 
-              {/* Gráfica (ingresos vs gastos vs ganancia) */}
-              <div className="px-3 py-3">
-                <ChartRenderer
-                  data={chartPoints}
-                  chartType={chartType}
-                  displayCurrency={displayCurrency}
-                  exchangeRate={exchangeRate}
-                  height={180}
-                  showLegend={false}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowChart(false);
+                }}
+                className="flex items-center gap-0.5 shrink-0 text-[10px] font-bold text-primary hover:underline"
+              >
+                <span className="material-symbols-outlined text-[13px]">arrow_back</span>
+                Resumen
+              </button>
+            </div>
 
-              <div className="px-3.5 pb-2.5 text-[9px] text-on-surface-variant/70">
-                Toca la gráfica para volver al resumen
-              </div>
-            </section>
-          </div>
-        </div>
+            {/* Gráfica (ingresos vs gastos vs ganancia) */}
+            <div className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+              <ChartRenderer
+                data={chartPoints}
+                chartType={chartType}
+                displayCurrency={displayCurrency}
+                exchangeRate={exchangeRate}
+                height={180}
+                showLegend={false}
+                selectedIndex={chartSelectedIndex}
+                onSelectPoint={(idx) => setChartSelectedIndex(idx)}
+              />
+            </div>
+
+            <div className="px-3.5 pb-2.5 text-[9px] text-on-surface-variant/70">
+              Toca una barra para ver sus números · toca fuera para regresar
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Quick Actions */}
