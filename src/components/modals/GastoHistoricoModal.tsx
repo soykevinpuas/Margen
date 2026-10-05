@@ -255,7 +255,7 @@ export const GastoHistoricoModal: React.FC<GastoHistoricoModalProps> = ({
                       title="Editar gasto"
                       className="w-8 h-8 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
                     >
-                      <span className="material-symbols-outlined text-[16px]">pencil_square</span>
+                      <span className="material-symbols-outlined text-[16px]">edit</span>
                     </button>
                   )}
                 </div>

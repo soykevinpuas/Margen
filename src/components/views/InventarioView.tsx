@@ -595,7 +595,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                           title="Editar lote"
                           className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all"
                         >
-                          <span className="material-symbols-outlined text-[13px]">pencil_square</span>
+                          <span className="material-symbols-outlined text-[13px]">edit</span>
                           Editar
                         </button>
 
@@ -718,7 +718,7 @@ export const InventarioView: React.FC<InventarioViewProps> = ({
                             title="Editar venta"
                             className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all"
                           >
-                            <span className="material-symbols-outlined text-[13px]">pencil_square</span>
+                            <span className="material-symbols-outlined text-[13px]">edit</span>
                             Editar
                           </button>
                           <button

@@ -486,7 +486,7 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                             title="Editar venta"
                             className="w-6 h-6 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
                           >
-                            <span className="material-symbols-outlined text-[14px]">pencil_square</span>
+                            <span className="material-symbols-outlined text-[14px]">edit</span>
                           </button>
                           <button
                             type="button"
@@ -523,7 +523,7 @@ export const CalendarioMesModal: React.FC<CalendarioMesModalProps> = ({
                             title="Editar gasto"
                             className="w-6 h-6 flex items-center justify-center rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
                           >
-                            <span className="material-symbols-outlined text-[14px]">pencil_square</span>
+                            <span className="material-symbols-outlined text-[14px]">edit</span>
                           </button>
                         </span>
                       </div>

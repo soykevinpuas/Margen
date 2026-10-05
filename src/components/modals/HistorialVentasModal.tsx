@@ -254,7 +254,7 @@ export const HistorialVentasModal: React.FC<HistorialVentasModalProps> = ({
                         title="Editar venta"
                         className="flex items-center gap-1 px-2.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 font-bold text-[10px] rounded-lg transition-all shrink-0"
                       >
-                        <span className="material-symbols-outlined text-[14px]">pencil_square</span>
+                        <span className="material-symbols-outlined text-[14px]">edit</span>
                         Editar
                       </button>
 
