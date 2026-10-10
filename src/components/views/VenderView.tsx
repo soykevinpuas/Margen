@@ -685,7 +685,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
 
       {/* STICKY BOTTOM SUMMARY PANEL */}
       {selectedProduct && (
-        <div className="fixed bottom-[64px] left-0 right-0 max-w-lg mx-auto bg-surface-container/95 backdrop-blur-md border-t border-x border-outline-variant/60 rounded-t-2xl z-40 p-4 space-y-3 shadow-2xl">
+        <div className="fixed bottom-[64px] lg:bottom-0 left-0 right-0 max-w-lg lg:max-w-5xl mx-auto bg-surface-container/95 backdrop-blur-md border-t border-x border-outline-variant/60 rounded-t-2xl z-40 p-4 space-y-3 shadow-2xl">
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
               <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-wider">
@@ -975,7 +975,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
             onClick={() => setIsProductSheetOpen(false)}
             className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]"
           ></div>
-          <div className="fixed bottom-0 left-0 w-full h-[75vh] bg-surface-container-high rounded-t-2xl z-[70] flex flex-col border-t border-outline-variant shadow-2xl animate-fade-in">
+          <div className="fixed bottom-0 left-0 w-full h-[75vh] sm:max-w-2xl sm:left-1/2 sm:-translate-x-1/2 bg-surface-container-high rounded-t-2xl z-[70] flex flex-col border-t border-outline-variant shadow-2xl animate-fade-in">
             <div className="flex justify-center p-3">
               <div className="w-12 h-1.5 bg-outline rounded-full"></div>
             </div>
@@ -1096,7 +1096,7 @@ export const VenderView: React.FC<VenderViewProps> = ({
             onClick={() => setAllocationModalOpen(false)}
             className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]"
           ></div>
-          <div className="fixed bottom-0 left-0 w-full h-[60vh] bg-surface-container-high rounded-t-2xl z-[70] flex flex-col border-t border-outline-variant shadow-2xl animate-fade-in">
+          <div className="fixed bottom-0 left-0 w-full h-[60vh] sm:max-w-2xl sm:left-1/2 sm:-translate-x-1/2 bg-surface-container-high rounded-t-2xl z-[70] flex flex-col border-t border-outline-variant shadow-2xl animate-fade-in">
             <div className="flex justify-center p-3">
               <div className="w-12 h-1.5 bg-outline rounded-full"></div>
             </div>

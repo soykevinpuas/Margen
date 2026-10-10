@@ -158,9 +158,14 @@ export const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-on-surface font-sans flex flex-col items-center justify-start antialiased selection:bg-primary selection:text-on-primary">
-      {/* Mobile Shell Frame max width on desktop for responsive elegance */}
-      <div className="w-full max-w-md min-h-screen flex flex-col relative bg-surface border-x border-outline-variant/30 shadow-2xl">
+    <div className="min-h-screen bg-background text-on-surface font-sans flex flex-col lg:flex-row items-center lg:items-stretch justify-start antialiased selection:bg-primary selection:text-on-primary">
+      {/* Sidebar (desktop) */}
+      <div className="hidden lg:block order-first">
+        <Navbar activeTab={activeTab} setActiveTab={setActiveTab} variant="sidebar" />
+      </div>
+
+      {/* Mobile Shell Frame / full width on desktop */}
+      <div className="w-full max-w-md lg:max-w-none lg:flex-1 min-h-screen flex flex-col relative bg-surface border-x border-outline-variant/30 shadow-2xl">
         {/* Top Sticky Header */}
         <Header
           currentTabTitle={tabTitles[activeTab]}
@@ -169,7 +174,7 @@ export const AppContent: React.FC = () => {
         />
 
         {/* Main View Area */}
-        <main className="flex-1 pb-6">
+        <main className="flex-1 pb-6 lg:pb-10 w-full lg:max-w-5xl lg:mx-auto">
           {overlayView === null && activeTab === 'inicio' && (
             <InicioView
               onNavigateTab={(tab) => setActiveTab(tab)}
@@ -259,8 +264,8 @@ export const AppContent: React.FC = () => {
           )}
         </main>
 
-        {/* Bottom Navigation */}
-        <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+        {/* Bottom Navigation (móvil/tablet) */}
+        <Navbar activeTab={activeTab} setActiveTab={setActiveTab} variant="bottom" />
       </div>
 
       {/* MODALS */}
