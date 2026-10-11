@@ -32,6 +32,37 @@ export interface AppSettings {
   primaryColor?: string;
   backgroundColor?: string;
   chartType?: 'barras' | 'lineas' | 'puntos' | 'radial';
+  /** Configuración de la vitrina virtual pública (embed en settings/config) */
+  vitrina?: VitrinaConfig;
+}
+
+/** Avatar de la vitrina (preset Lottie + nombre + color de marca) */
+export interface VitrinaAvatar {
+  preset: string;
+  nombre: string;
+  color: string;
+  saludo?: string;
+}
+
+/** Configuración de la vitrina virtual de un negocio (embed en settings/config) */
+export interface VitrinaConfig {
+  activa: boolean;
+  slug?: string;
+  whatsapp?: string;
+  mensajePlantilla?: string;
+  avatar?: VitrinaAvatar;
+  productosDestacados?: string[];
+}
+
+/** Índice público desnormalizado en vitrinas/{slug} (lectura pública) */
+export interface VitrinaIndex {
+  uid: string;
+  businessId: string;
+  activa: boolean;
+  nombreNegocio: string;
+  whatsapp?: string;
+  mensajePlantilla?: string;
+  avatar?: VitrinaAvatar;
 }
 
 export interface Category {
@@ -54,6 +85,8 @@ export interface Product {
   imagen?: string;
   archivado: boolean;
   createdAt: string;
+  /** Stock total denormalizado (suma de cantidadDisponible de sus lotes) para la vitrina */
+  stockDisponible?: number;
 }
 
 export interface ExpenseItem {

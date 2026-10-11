@@ -1,9 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
+  // Slug válido para vitrinas/{slug}: 3-30 caracteres, inicia alfanumérico, admite - y _
+  function isValidSlug(slug) {
+    return slug.matches('^[a-z0-9][a-z0-9_-]{2,29}$');
+  }
+
   match /databases/{database}/documents {
+
+    // Vitrina pública: lectura abierta; escritura solo del dueño del negocio
+    match /vitrinas/{slug} {
+      allow read: if true;
+      // Crear: dueño, slug válido y que su business exista
+      allow create: if request.auth != null
+        && isValidSlug(slug)
+        && request.resource.data.uid == request.auth.uid
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/businesses/$(request.resource.data.businessId));
+      // Actualizar: dueño, slug válido, uid/businessId no cambian y el business sigue siendo suyo
+      allow update: if request.auth != null
+        && isValidSlug(slug)
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.businessId == resource.data.businessId
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/businesses/$(resource.data.businessId));
+      // Borrar: dueño, slug válido y que su business exista
+      allow delete: if request.auth != null
+        && isValidSlug(slug)
+        && resource.data.uid == request.auth.uid
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/businesses/$(resource.data.businessId));
+    }
+
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
+      // Productos: el dueño siempre (catch-all); público get/list solo si la
+      // vitrina está activa (fail-closed: sin settings o sin vitrina → denegado)
+      match /businesses/{businessId}/products/{productId} {
+        allow get, list: if (request.auth != null && request.auth.uid == userId)
+          || get(/databases/$(database)/documents/users/$(userId)/businesses/$(businessId)/settings/config).data.vitrina.activa == true;
+      }
+
+      // El resto (settings, batches, sales, expenses, adjustments, categories): owner-only
       match /{document=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

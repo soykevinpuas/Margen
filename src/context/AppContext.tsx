@@ -4,6 +4,7 @@ import {
   collection,
   setDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   getDocs,
   getDoc,
@@ -12,6 +13,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { syncVitrinaIndex } from '../lib/vitrina';
 import { useAuth } from './AuthContext';
 import {
   AppSettings,
@@ -27,6 +29,7 @@ import {
   ExpenseItem,
   SaleExpenseItem,
   AdjustmentReason,
+  VitrinaConfig,
 } from '../types';
 import {
   initialSettings,
@@ -56,6 +59,8 @@ interface AppContextType {
 
   // Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
+  /** Guarda la config de la vitrina y sincroniza el índice público vitrinas/{slug} */
+  actualizarVitrina: (config: VitrinaConfig) => void;
   addCategory: (nombre: string) => Category;
   addProduct: (productData: Omit<Product, 'id' | 'createdAt' | 'archivado'>) => Product;
   updateProduct: (id: string, productData: Partial<Product>) => void;
@@ -766,6 +771,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(bizStorageKey(currentBusinessId, 'settings'), JSON.stringify(settings));
   }, [settings, currentBusinessId, user, guestHydrated, guestHydratedBizId]);
 
+  // Denormaliza stockDisponible en products para la vitrina pública (debounced ~1s)
+  useEffect(() => {
+    if (!user || !currentBusinessId) return;
+    const uid = user.uid;
+    const bizId = currentBusinessId;
+
+    const timer = setTimeout(() => {
+      // Suma de cantidadDisponible por producto (sin lotes → undefined)
+      const sumas = new Map<string, number>();
+      batches.forEach((b) => {
+        sumas.set(b.productoId, (sumas.get(b.productoId) ?? 0) + (b.cantidadDisponible ?? 0));
+      });
+
+      // Solo escribe productos cuyo stockDisponible cambió
+      const cambios: Array<{ ref: DocumentReference; data: DocumentData }> = [];
+      products.forEach((p) => {
+        const stock = sumas.has(p.id) ? (sumas.get(p.id) as number) : undefined;
+        if (p.stockDisponible === stock) return;
+        cambios.push({
+          ref: doc(db, 'users', uid, 'businesses', bizId, 'products', p.id),
+          data:
+            stock === undefined
+              ? { stockDisponible: deleteField() } // sin lotes: quita el campo
+              : { stockDisponible: stock },
+        });
+      });
+      if (cambios.length === 0) return;
+
+      // Multi-doc en chunks (writeBatch admite hasta 500 operaciones)
+      void (async () => {
+        for (let i = 0; i < cambios.length; i += FIRESTORE_WRITE_CHUNK) {
+          const batch = writeBatch(db);
+          cambios
+            .slice(i, i + FIRESTORE_WRITE_CHUNK)
+            .forEach((c) => batch.update(c.ref, c.data));
+          try {
+            await batch.commit();
+          } catch (err) {
+            console.error('Error denormalizando stockDisponible:', err);
+          }
+        }
+      })();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [batches, products, user, currentBusinessId]);
+
   // Apply custom primary theme color and background color
   useEffect(() => {
     const colorMap: Record<string, { primary: string; onPrimary: string }> = {
@@ -942,6 +994,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const ref = bizDoc('settings', 'config');
     // merge:true so we never wipe fields not included in this patch
     if (ref) safeSetDoc(ref, newSettings, { merge: true });
+  };
+
+  const actualizarVitrina = (config: VitrinaConfig) => {
+    // Optimista: merge del bloque vitrina en settings (local + Firestore)
+    updateSettings({ vitrina: config });
+    if (user && currentBusinessId) {
+      // syncVitrinaIndex es la única escritora de settings/vitrina + vitrinas/{slug}
+      void syncVitrinaIndex(
+        db,
+        user.uid,
+        currentBusinessId,
+        config,
+        settings.businessName
+      ).catch((err) => console.error('Error sincronizando vitrina:', err));
+    }
   };
 
   const addCategory = (nombre: string): Category => {
@@ -1621,6 +1688,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createBusiness,
         switchBusiness,
         updateSettings,
+        actualizarVitrina,
         addCategory,
         addProduct,
         updateProduct,
