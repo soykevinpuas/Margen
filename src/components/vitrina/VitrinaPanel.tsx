@@ -18,9 +18,9 @@ import {
   normalizeSlug,
 } from '../../lib/vitrina';
 import type { VitrinaConfig } from '../../types';
-import { AvatarLottie } from './AvatarLottie';
+import { AvatarAnimado } from './AvatarAnimado';
 
-// Presets disponibles para el selector (misma lista que AvatarLottie)
+// Presets disponibles para el selector (misma lista que AvatarAnimado)
 const PRESETS = [
   { id: 'luna', nombre: 'Luna' },
   { id: 'nube', nombre: 'Nube' },
@@ -177,7 +177,7 @@ export const VitrinaPanel: React.FC = () => {
 
       {/* Vista previa en vivo del avatar */}
       <div className="p-3 bg-surface-container-highest/50 border border-outline-variant/40 rounded-xl">
-        <AvatarLottie
+        <AvatarAnimado
           preset={preset}
           nombre={nombreAvatar}
           color={colorAvatar}
@@ -313,7 +313,7 @@ export const VitrinaPanel: React.FC = () => {
               }`}
             >
               <div className="scale-[0.62] -my-2.5 pointer-events-none">
-                <AvatarLottie preset={p.id} nombre="" color={colorAvatar} />
+                <AvatarAnimado preset={p.id} nombre="" color={colorAvatar} />
               </div>
               <span className="text-[9px] font-bold text-on-surface-variant">
                 {p.nombre}

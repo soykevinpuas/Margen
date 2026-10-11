@@ -101,3 +101,39 @@
   0% { transform: scale(0.8); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* Avatar de la vitrina: saludo, rebote y flotado (CSS puro) */
+@keyframes saludoAvatar {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(8deg); }
+}
+
+.animate-saludo-avatar {
+  animation: saludoAvatar 2.4s ease-in-out infinite;
+}
+
+@keyframes reboteAvatar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-rebote-avatar {
+  animation: reboteAvatar 2s ease-in-out infinite;
+}
+
+@keyframes flotarAvatar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.animate-flotar-avatar {
+  animation: flotarAvatar 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-saludo-avatar,
+  .animate-rebote-avatar,
+  .animate-flotar-avatar {
+    animation: none;
+  }
+}

@@ -4,7 +4,7 @@ import { Store, MessageCircle, AlertCircle } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import type { Product, VitrinaIndex } from '../../types';
 import { buildWhatsAppLink } from '../../lib/vitrina';
-import { AvatarLottie } from '../vitrina/AvatarLottie';
+import { AvatarAnimado } from '../vitrina/AvatarAnimado';
 import { ProductoCardVitrina } from '../vitrina/ProductoCardVitrina';
 
 interface VitrinaViewProps {
@@ -118,7 +118,7 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
     <div className="min-h-screen bg-background text-on-surface font-sans flex flex-col antialiased">
       {/* Header: avatar + nombre del negocio */}
       <header className="sticky top-0 z-10 bg-surface/90 backdrop-blur border-b border-outline-variant/30 px-4 py-3.5">
-        <AvatarLottie
+        <AvatarAnimado
           preset={avatar?.preset || 'luna'}
           nombre={avatar?.nombre || ''}
           color={avatar?.color || '#10B981'}
