@@ -7,6 +7,7 @@ import { VenderView } from './components/views/VenderView';
 import { GraficasView } from './components/views/GraficasView';
 import { MasView } from './components/views/MasView';
 import { LandingPage } from './components/views/LandingPage';
+import { VitrinaView } from './components/views/VitrinaView';
 import { useAuth } from './context/AuthContext';
 import { useApp } from './context/AppContext';
 
@@ -29,11 +30,17 @@ import {
   EditableRecordType,
 } from './components/modals/EditarRegistroModal';
 
+// URL pública de vitrina: /{slug} (Firebase Hosting reescribe a index.html)
+const VITRINA_PATH_REGEX = /^\/([a-z0-9][a-z0-9_-]{2,29})$/;
+
 export const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const { businessLoading } = useApp();
   const [viewMode, setViewMode] = useState<'app' | 'landing'>('app');
   const [activeTab, setActiveTab] = useState<TabType>('inicio');
+
+  // Modo vitrina pública: se renderiza ANTES del gate de auth (sin Header/Navbar)
+  const vitrinaSlug = window.location.pathname.match(VITRINA_PATH_REGEX)?.[1];
 
   // Modal States
   const [isCompraOpen, setIsCompraOpen] = useState(false);
@@ -73,6 +80,12 @@ export const AppContent: React.FC = () => {
   };
 
   const [overlayView, setOverlayView] = useState<'vender' | 'graficas' | null>(null);
+
+  // 0. Vitrina pública /{slug}: visitante sin login, sin chrome de app
+  // (después de todos los hooks; pathname es estable sin recarga)
+  if (vitrinaSlug) {
+    return <VitrinaView slug={vitrinaSlug} />;
+  }
 
   const handleSelectProduct = (productId: string) => {
     setSelectedProductId(productId);

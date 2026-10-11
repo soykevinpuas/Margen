@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { LogOut, UserCheck, Shield, Key } from 'lucide-react';
 import { ExportExcelModal } from './ExportExcelModal';
+import { VitrinaPanel } from '../vitrina/VitrinaPanel';
 
 interface ConfiguracionModalProps {
   isOpen: boolean;
@@ -356,6 +357,9 @@ export const ConfiguracionModal: React.FC<ConfiguracionModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Vitrina virtual (pública) */}
+          <VitrinaPanel />
 
           {/* Auth Section */}
           <div className="p-3 bg-surface-container border border-outline/30 rounded-xl space-y-2">
