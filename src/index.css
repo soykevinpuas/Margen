@@ -102,6 +102,15 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* Oculta la barra de scroll en carruseles horizontales (chips de categorías) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Avatar de la vitrina: saludo, rebote y flotado (CSS puro) */
 @keyframes saludoAvatar {
   0%, 100% { transform: rotate(0deg); }

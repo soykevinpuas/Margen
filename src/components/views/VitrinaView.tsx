@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { Store, MessageCircle, AlertCircle } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import type { Product, VitrinaIndex } from '../../types';
+import type { Category, Product, VitrinaIndex } from '../../types';
 import { buildWhatsAppLink } from '../../lib/vitrina';
 import { AvatarAnimado } from '../vitrina/AvatarAnimado';
 import { ProductoCardVitrina } from '../vitrina/ProductoCardVitrina';
@@ -17,6 +17,8 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
   const [estado, setEstado] = useState<Estado>('cargando');
   const [vitrina, setVitrina] = useState<VitrinaIndex | null>(null);
   const [productos, setProductos] = useState<Product[]>([]);
+  const [categorias, setCategorias] = useState<Category[]>([]);
+  const [categoriaActiva, setCategoriaActiva] = useState<string>('todas');
 
   useEffect(() => {
     let cancelado = false;
@@ -52,7 +54,28 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
           .map((d) => ({ ...d.data(), id: d.id } as Product))
           .filter((p) => p.archivado === false);
 
-        // 3) Destacados primero (si el dueño los marcó)
+        // 3) Categorías públicas (si fallan, la vitrina sigue mostrando productos)
+        let categoriasLista: Category[] = [];
+        try {
+          const catsSnap = await getDocs(
+            collection(
+              db,
+              'users',
+              data.uid,
+              'businesses',
+              data.businessId,
+              'categories'
+            )
+          );
+          categoriasLista = catsSnap.docs
+            .map((d) => ({ ...d.data(), id: d.id } as Category))
+            .filter((c) => !c.archived);
+        } catch (err) {
+          console.error('No se pudieron cargar las categorías:', err);
+        }
+        if (cancelado) return;
+
+        // 4) Destacados primero (si el dueño los marcó)
         if (data.productosDestacados?.length) {
           lista.sort(
             (a, b) =>
@@ -64,6 +87,7 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
                 : data.productosDestacados!.indexOf(b.id))
           );
         }
+        setCategorias(categoriasLista);
         setProductos(lista);
         setEstado('lista');
       } catch (err) {
@@ -114,6 +138,20 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
   const saludo =
     avatar?.saludo?.trim() || `¡Hola! Bienvenido a ${vitrina?.nombreNegocio}`;
 
+  // Categorías con al menos un producto visible (orden alfabético)
+  const categoriasVisibles = categorias
+    .map((c) => ({
+      ...c,
+      total: productos.filter((p) => p.categoriaId === c.id).length,
+    }))
+    .filter((c) => c.total > 0)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+  const productosFiltrados =
+    categoriaActiva === 'todas'
+      ? productos
+      : productos.filter((p) => p.categoriaId === categoriaActiva);
+
   return (
     <div className="min-h-screen bg-background text-on-surface font-sans flex flex-col antialiased">
       {/* Header: avatar + nombre del negocio */}
@@ -125,6 +163,40 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
           saludo={saludo}
           nombreNegocio={vitrina?.nombreNegocio}
         />
+
+        {/* Filtro por categorías (solo las que tienen productos) */}
+        {categoriasVisibles.length > 0 && (
+          <div className="mt-3 -mx-4 px-4 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 w-max pb-0.5">
+              <button
+                type="button"
+                onClick={() => setCategoriaActiva('todas')}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap border transition-colors ${
+                  categoriaActiva === 'todas'
+                    ? 'bg-primary text-on-primary border-primary'
+                    : 'bg-surface-container-high text-on-surface-variant border-outline-variant hover:text-on-surface'
+                }`}
+              >
+                Todos <span className="opacity-70">({productos.length})</span>
+              </button>
+
+              {categoriasVisibles.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoriaActiva(c.id)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap border transition-colors ${
+                    categoriaActiva === c.id
+                      ? 'bg-primary text-on-primary border-primary'
+                      : 'bg-surface-container-high text-on-surface-variant border-outline-variant hover:text-on-surface'
+                  }`}
+                >
+                  {c.nombre} <span className="opacity-70">({c.total})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 w-full max-w-md lg:max-w-3xl mx-auto p-4">
@@ -161,10 +233,22 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
               </p>
             )}
           </div>
+        ) : productosFiltrados.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-surface-container border border-outline-variant flex items-center justify-center text-on-surface-variant">
+              <Store className="w-7 h-7" />
+            </div>
+            <h2 className="text-sm font-headline font-bold text-on-surface">
+              No hay productos en esta categoría
+            </h2>
+            <p className="text-xs text-on-surface-variant max-w-xs">
+              Prueba con otra categoría o revisa todo el catálogo.
+            </p>
+          </div>
         ) : (
           /* Grid de productos (mobile-first) */
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            {productos.map((p) => (
+            {productosFiltrados.map((p) => (
               <ProductoCardVitrina
                 key={p.id}
                 producto={p}
