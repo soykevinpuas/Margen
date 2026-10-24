@@ -29,7 +29,13 @@ const PRESETS = [
 
 const COLORES = ['#10B981', '#3B82F6', '#F59E0B', '#F43F5E', '#8B5CF6', '#14B8A6'];
 
-type SlugEstado = 'inicial' | 'verificando' | 'disponible' | 'en-uso' | 'invalido';
+type SlugEstado =
+  | 'inicial'
+  | 'verificando'
+  | 'disponible'
+  | 'en-uso'
+  | 'invalido'
+  | 'error';
 
 export const VitrinaPanel: React.FC = () => {
   const { settings, actualizarVitrina } = useApp();
@@ -53,6 +59,7 @@ export const VitrinaPanel: React.FC = () => {
   const [slugEstado, setSlugEstado] = useState<SlugEstado>('inicial');
   const [guardando, setGuardando] = useState(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 
   const qrRef = useRef<HTMLDivElement>(null);
@@ -73,22 +80,38 @@ export const VitrinaPanel: React.FC = () => {
       setSlugEstado('disponible'); // el que ya tiene este negocio
       return;
     }
+
+    let cancelado = false;
     setSlugEstado('verificando');
     const timer = setTimeout(() => {
-      void checkSlugAvailable(db, slug).then((ok) =>
-        setSlugEstado(ok ? 'disponible' : 'en-uso')
-      );
+      void checkSlugAvailable(db, slug)
+        .then((ok) => {
+          if (!cancelado) setSlugEstado(ok ? 'disponible' : 'en-uso');
+        })
+        .catch((err) => {
+          console.error('Error verificando slug:', err);
+          if (!cancelado) setSlugEstado('error');
+        });
     }, 450);
-    return () => clearTimeout(timer);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
   }, [slugTexto, slugGuardado]);
 
+  // Solo se puede guardar si el slug está verificado (o vacío con vitrina inactiva)
+  const slugListo =
+    slugNormalizado === '' ? !activa : slugEstado === 'disponible';
   const puedeGuardar =
     !!user &&
     slugEstado !== 'verificando' &&
-    (!activa || (slugNormalizado !== '' && slugEstado === 'disponible'));
+    slugEstado !== 'error' &&
+    slugListo;
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!puedeGuardar || guardando) return;
+
     const config: VitrinaConfig = {
       activa,
       slug: slugNormalizado || undefined,
@@ -101,13 +124,23 @@ export const VitrinaPanel: React.FC = () => {
         saludo: saludo.trim() || undefined,
       },
     };
+
     setGuardando(true);
-    actualizarVitrina(config);
-    setTimeout(() => {
-      setGuardando(false);
+    setGuardadoOk(false);
+    setErrorGuardado(null);
+
+    try {
+      await actualizarVitrina(config);
       setGuardadoOk(true);
       setTimeout(() => setGuardadoOk(false), 2500);
-    }, 500);
+    } catch (err) {
+      console.error('Error guardando vitrina:', err);
+      setErrorGuardado(
+        'No se pudo guardar la vitrina. Revisa tu conexión e inténtalo de nuevo.'
+      );
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const copiarLink = async () => {
@@ -156,13 +189,17 @@ export const VitrinaPanel: React.FC = () => {
           <Store className="w-3.5 h-3.5 text-primary" />
           Vitrina Virtual (pública)
         </span>
-        {user ? (
+        {!user ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            Local
+          </span>
+        ) : vitrina?.activa ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
             <Globe className="w-3 h-3" /> En línea
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            Local
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container-highest text-on-surface-variant border border-outline-variant">
+            <Store className="w-3 h-3" /> Sin activar
           </span>
         )}
       </div>
@@ -207,8 +244,8 @@ export const VitrinaPanel: React.FC = () => {
           }`}
         >
           <span
-            className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-              activa ? 'translate-x-[22px]' : 'translate-x-0.5'
+            className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              activa ? 'translate-x-[22px]' : 'translate-x-0'
             }`}
           />
         </button>
@@ -251,6 +288,11 @@ export const VitrinaPanel: React.FC = () => {
           {slugEstado === 'invalido' && (
             <span className="text-[9px] font-bold text-amber-400 shrink-0">
               3-30 caracteres (a-z, 0-9, - o _)
+            </span>
+          )}
+          {slugEstado === 'error' && (
+            <span className="text-[9px] font-bold text-error shrink-0">
+              no se pudo verificar
             </span>
           )}
         </div>
@@ -434,6 +476,11 @@ export const VitrinaPanel: React.FC = () => {
           </>
         )}
       </button>
+      {errorGuardado && (
+        <p className="text-[10px] text-error font-bold text-center">
+          {errorGuardado}
+        </p>
+      )}
       {guardadoOk && activa && linkPublico && (
         <p className="text-[10px] text-emerald-400 font-bold text-center">
           Tu vitrina está en {linkPublico}

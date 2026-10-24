@@ -4,7 +4,6 @@ import {
   DocumentData,
   getDoc,
   doc,
-  setDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { VitrinaConfig } from '../types';
@@ -44,17 +43,33 @@ export async function checkSlugAvailable(
   slug: string
 ): Promise<boolean> {
   if (!SLUG_REGEX.test(slug)) return false; // formato inválido → no disponible
-  const snap = await getDoc(doc(db, 'vitrinas', slug));
-  return !snap.exists();
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // Timeout defensivo: evita que el spinner quede pegado si la red no responde
+    const snap = await Promise.race([
+      getDoc(doc(db, 'vitrinas', slug)),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('Tiempo de espera agotado al verificar slug')),
+          8000
+        );
+      }),
+    ]);
+    return !snap.exists();
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 type VitrinaOp =
   | { tipo: 'set'; ref: DocumentReference; data: DocumentData; merge?: boolean }
+  | { tipo: 'update'; ref: DocumentReference; data: DocumentData }
   | { tipo: 'delete'; ref: DocumentReference };
 
 /**
  * Única función que escribe la vitrina de un negocio:
- * - merge del bloque `vitrina` en settings/config
+ * - reemplaza el bloque `vitrina` en settings/config
  * - doc público vitrinas/{slug} (crear/actualizar; activa:false reserva el slug)
  * - borra el doc viejo si el slug cambió
  */
@@ -71,15 +86,22 @@ export async function syncVitrinaIndex(
   );
   const oldSlug = (settingsSnap.data()?.vitrina as VitrinaConfig | undefined)?.slug;
   const newSlug = config.slug?.trim() || undefined;
+  const settingsRef = doc(
+    db,
+    'users',
+    uid,
+    'businesses',
+    businessId,
+    'settings',
+    'config'
+  );
+  const settingsData = { vitrina: limpiarUndefined(config) } as DocumentData;
 
   const ops: VitrinaOp[] = [
-    // 1) Merge del bloque vitrina en settings/config
-    {
-      tipo: 'set',
-      ref: doc(db, 'users', uid, 'businesses', businessId, 'settings', 'config'),
-      data: { vitrina: limpiarUndefined(config) },
-      merge: true,
-    },
+    // 1) Reemplaza el bloque vitrina en settings/config (update = reemplazo del mapa)
+    settingsSnap.exists()
+      ? { tipo: 'update', ref: settingsRef, data: settingsData }
+      : { tipo: 'set', ref: settingsRef, data: settingsData, merge: true },
   ];
 
   // 2) Índice público (solo campos públicos)
@@ -102,20 +124,20 @@ export async function syncVitrinaIndex(
     ops.push({ tipo: 'set', ref: doc(db, 'vitrinas', newSlug), data: indexData });
   }
 
-  // 3) Si el slug cambió, borra el doc viejo
+  // 3) Si el slug cambió, borra el doc viejo (solo si existe)
   if (oldSlug && oldSlug !== newSlug) {
-    ops.push({ tipo: 'delete', ref: doc(db, 'vitrinas', oldSlug) });
+    const oldIndexSnap = await getDoc(doc(db, 'vitrinas', oldSlug));
+    if (oldIndexSnap.exists()) {
+      ops.push({ tipo: 'delete', ref: doc(db, 'vitrinas', oldSlug) });
+    }
   }
 
-  // Un solo doc → setDoc directo; varios docs → writeBatch
-  if (ops.length === 1 && ops[0].tipo === 'set') {
-    await setDoc(ops[0].ref, ops[0].data, { merge: true });
-    return;
-  }
   const batch = writeBatch(db);
   ops.forEach((op) => {
     if (op.tipo === 'delete') {
       batch.delete(op.ref);
+    } else if (op.tipo === 'update') {
+      batch.update(op.ref, op.data);
     } else if (op.merge) {
       batch.set(op.ref, op.data, { merge: true });
     } else {

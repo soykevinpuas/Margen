@@ -1,4 +1,8 @@
 {
+  "firestore": {
+    "database": "ai-studio-margen-57f36e98-8ebe-42f2-ae03-681187c7fc99",
+    "rules": "firestore.rules"
+  },
   "hosting": {
     "public": "dist",
     "ignore": [

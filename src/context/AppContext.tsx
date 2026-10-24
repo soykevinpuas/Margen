@@ -60,7 +60,8 @@ interface AppContextType {
   // Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   /** Guarda la config de la vitrina y sincroniza el índice público vitrinas/{slug} */
-  actualizarVitrina: (config: VitrinaConfig) => void;
+  /** Guarda la config de la vitrina y sincroniza el índice público (async) */
+  actualizarVitrina: (config: VitrinaConfig) => Promise<void>;
   addCategory: (nombre: string) => Category;
   addProduct: (productData: Omit<Product, 'id' | 'createdAt' | 'archivado'>) => Product;
   updateProduct: (id: string, productData: Partial<Product>) => void;
@@ -996,18 +997,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (ref) safeSetDoc(ref, newSettings, { merge: true });
   };
 
-  const actualizarVitrina = (config: VitrinaConfig) => {
-    // Optimista: merge del bloque vitrina en settings (local + Firestore)
-    updateSettings({ vitrina: config });
-    if (user && currentBusinessId) {
-      // syncVitrinaIndex es la única escritora de settings/vitrina + vitrinas/{slug}
-      void syncVitrinaIndex(
+  const actualizarVitrina = async (config: VitrinaConfig) => {
+    const anterior = settings.vitrina;
+
+    // Optimista: solo estado local; la escritura real la hace syncVitrinaIndex
+    setSettings((prev) => ({ ...prev, vitrina: config }));
+
+    if (!user || !currentBusinessId) return;
+
+    try {
+      // Única escritora de settings/vitrina + vitrinas/{slug}
+      await syncVitrinaIndex(
         db,
         user.uid,
         currentBusinessId,
         config,
         settings.businessName
-      ).catch((err) => console.error('Error sincronizando vitrina:', err));
+      );
+    } catch (err) {
+      // Si falla la persistencia, revierte el estado local
+      setSettings((prev) => ({ ...prev, vitrina: anterior }));
+      throw err;
     }
   };
 
