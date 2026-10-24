@@ -22,6 +22,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
 
   const [nombre, setNombre] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
+  const [descripcion, setDescripcion] = useState('');
   const [sku, setSku] = useState('');
   const [precioSugerido, setPrecioSugerido] = useState('');
   const [stockMinimo, setStockMinimo] = useState<number | string>(settings.defaultMinStock ?? 3);
@@ -38,6 +39,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
       if (existingProduct) {
         setNombre(existingProduct.nombre);
         setCategoriaId(existingProduct.categoriaId || defaultCatId);
+        setDescripcion(existingProduct.descripcion || '');
         setSku(existingProduct.sku || '');
         setPrecioSugerido(existingProduct.precioSugerido != null ? String(existingProduct.precioSugerido) : '');
         setStockMinimo(existingProduct.stockMinimo);
@@ -45,6 +47,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
       } else {
         setNombre('');
         setCategoriaId(defaultCatId);
+        setDescripcion('');
         setSku('');
         setPrecioSugerido('');
         setStockMinimo(settings.defaultMinStock ?? 3);
@@ -79,6 +82,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
       const productPayload: any = {
         nombre: nombre.trim(),
         categoriaId: activeCategoriaId,
+        descripcion: descripcion.trim(),
         stockMinimo: parsedStockMin,
       };
 
@@ -96,6 +100,7 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
 
       // Reset fields
       setNombre('');
+      setDescripcion('');
       setSku('');
       setPrecioSugerido('');
       setImagen('');
@@ -149,6 +154,23 @@ export const NuevoProductoModal: React.FC<NuevoProductoModalProps> = ({
               onChange={(e) => setNombre(e.target.value)}
               className="w-full h-10 bg-surface-container border border-outline-variant text-on-surface rounded-lg px-3 text-xs focus:outline-none focus:border-primary font-bold"
             />
+          </div>
+
+          <div>
+            <label className="block font-bold text-on-surface-variant uppercase tracking-wider text-[10px] mb-1">
+              Sinopsis / Descripción (Opcional)
+            </label>
+            <textarea
+              rows={3}
+              maxLength={800}
+              placeholder="Ej. Una historia sobre..., de qué trata el libro, edición, estado..."
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              className="w-full bg-surface-container border border-outline-variant text-on-surface rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary resize-none leading-relaxed"
+            />
+            <p className="text-[9px] text-on-surface-variant mt-1">
+              Aparece en la vitrina al deslizar la portada del producto.
+            </p>
           </div>
 
           <div>

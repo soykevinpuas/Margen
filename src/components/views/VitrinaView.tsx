@@ -248,14 +248,21 @@ export const VitrinaView: React.FC<VitrinaViewProps> = ({ slug }) => {
         ) : (
           /* Grid de productos (mobile-first) */
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            {productosFiltrados.map((p) => (
-              <ProductoCardVitrina
-                key={p.id}
-                producto={p}
-                whatsapp={whatsapp}
-                mensajePlantilla={vitrina?.mensajePlantilla}
-              />
-            ))}
+            {productosFiltrados.map((p) => {
+              const categoria = categorias.find(
+                (c) => c.id === p.categoriaId
+              );
+
+              return (
+                <ProductoCardVitrina
+                  key={p.id}
+                  producto={p}
+                  whatsapp={whatsapp}
+                  mensajePlantilla={vitrina?.mensajePlantilla}
+                  categoriaNombre={categoria?.nombre}
+                />
+              );
+            })}
           </div>
         )}
       </main>

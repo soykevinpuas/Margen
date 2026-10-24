@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
-import { ImagenZoom } from '../ImagenZoom';
 import type { Product } from '../../types';
 import { buildWhatsAppLink } from '../../lib/vitrina';
+import { ProductoDetalleVitrina } from './ProductoDetalleVitrina';
 
 // Precio en MXN (precioSugerido es moneda contable base)
 const fmtMoneda = new Intl.NumberFormat('es-MX', {
@@ -25,14 +25,17 @@ interface ProductoCardVitrinaProps {
   producto: Product;
   whatsapp?: string;
   mensajePlantilla?: string;
+  categoriaNombre?: string;
 }
 
 export const ProductoCardVitrina: React.FC<ProductoCardVitrinaProps> = ({
   producto,
   whatsapp,
   mensajePlantilla,
+  categoriaNombre,
 }) => {
-  // Precarga la foto para detectar onError (ImagenZoom no expone onError)
+  const [detalleOpen, setDetalleOpen] = useState(false);
+  // Precarga la foto para detectar onError (la imagen se muestra en la card y el detalle)
   const [estadoImg, setEstadoImg] = useState<'cargando' | 'ok' | 'error'>(
     producto.imagen ? 'cargando' : 'error'
   );
@@ -60,23 +63,37 @@ export const ProductoCardVitrina: React.FC<ProductoCardVitrinaProps> = ({
       : null;
 
   return (
-    <article className="bg-surface-container border border-outline-variant/40 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-      {/* Foto (zoom opcional); sin imagen o error → placeholder con iniciales */}
-      <div className="relative aspect-square bg-surface-container-highest/40">
-        {estadoImg === 'ok' && producto.imagen ? (
-          <ImagenZoom
-            src={producto.imagen}
-            alt={producto.nombre}
-            className="w-full h-full"
-            imgClassName="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-primary/10">
-            <span className="text-4xl font-headline font-extrabold text-primary/40">
-              {producto.nombre.trim().charAt(0).toUpperCase() || '?'}
-            </span>
-          </div>
-        )}
+    <>
+      <article
+        onClick={() => setDetalleOpen(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setDetalleOpen(true);
+          }
+        }}
+        className="bg-surface-container border border-outline-variant/40 rounded-2xl overflow-hidden shadow-sm flex flex-col cursor-pointer hover:border-primary/40 transition-colors"
+      >
+        {/* Foto (tap en la card abre portada + sinopsis) */}
+        <div className="relative aspect-square bg-surface-container-highest/40">
+          {estadoImg === 'ok' && producto.imagen ? (
+            <img
+              src={producto.imagen}
+              alt={producto.nombre}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-primary/10">
+              <span className="text-4xl font-headline font-extrabold text-primary/40">
+                {producto.nombre.trim().charAt(0).toUpperCase() || '?'}
+              </span>
+            </div>
+          )}
         {estadoImg === 'cargando' && (
           <div className="absolute inset-0 animate-pulse bg-surface-container-highest/30" />
         )}
@@ -120,6 +137,7 @@ export const ProductoCardVitrina: React.FC<ProductoCardVitrinaProps> = ({
             href={linkWa}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
             className={`mt-2 w-full py-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
               agotado
                 ? 'bg-surface-container-highest text-on-surface-variant'
@@ -131,6 +149,17 @@ export const ProductoCardVitrina: React.FC<ProductoCardVitrinaProps> = ({
           </a>
         )}
       </div>
-    </article>
+      </article>
+
+      {detalleOpen && (
+        <ProductoDetalleVitrina
+          producto={producto}
+          whatsapp={whatsapp}
+          mensajePlantilla={mensajePlantilla}
+          categoriaNombre={categoriaNombre}
+          onClose={() => setDetalleOpen(false)}
+        />
+      )}
+    </>
   );
 };
