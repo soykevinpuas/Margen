@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import { ImagenZoom } from '../ImagenZoom';
 import {
   formatMoney,
-  getProductTotalStock,
   getProductBadges,
   getPeriodTotals,
   getLocalDateKey,
@@ -92,16 +91,18 @@ export const InicioView: React.FC<InicioViewProps> = ({
   onSelectProduct,
   onEdit,
 }) => {
-  const { settings, products, batches, sales, operatingExpenses } = useApp();
+  const { settings, products, categories, batches, sales, operatingExpenses } = useApp();
   const { displayCurrency, exchangeRate, chartType = 'barras' } = settings;
 
   // Modals & Interactive States
   const [isCalendarioOpen, setIsCalendarioOpen] = useState(false);
-  const [isAlertasOpen, setIsAlertasOpen] = useState(false);
 
   // Toggle: card "Resumen financiero" <-> gráfica (en la misma posición)
   const [showChart, setShowChart] = useState(false);
   const [chartSelectedIndex, setChartSelectedIndex] = useState<number | null>(null);
+
+  // Top Ventas: lista detallada <-> gráfica de barras
+  const [topView, setTopView] = useState<'lista' | 'grafica'>('lista');
 
   // Temporalidad del dashboard KPI (rota automáticamente cada 5s)
   const [periodIndex, setPeriodIndex] = useState(0);
@@ -189,36 +190,53 @@ export const InicioView: React.FC<InicioViewProps> = ({
     });
   }, [showChart, sales, operatingExpenses]);
 
-  // Stock alerts
-  const outOfStockProducts = products.filter((p) => {
-    if (p.archivado) return false;
-    const stock = getProductTotalStock(p.id, batches);
-    return stock === 0;
-  });
+  // Top Ventas (histórico): unidades, ingresos y ganancia por producto
+  const TOP_LIMIT = 5;
+  const productStatsMap = new Map<
+    string,
+    { qty: number; revenueMXN: number; profitMXN: number }
+  >();
 
-  const lowStockProducts = products.filter((p) => {
-    if (p.archivado) return false;
-    const stock = getProductTotalStock(p.id, batches);
-    return stock > 0 && stock <= p.stockMinimo;
-  });
-
-  // Top Sellers
-  const productSalesMap = new Map<string, number>();
   confirmedSales.forEach((s) => {
-    productSalesMap.set(
-      s.productoId,
-      (productSalesMap.get(s.productoId) || 0) + s.cantidad
-    );
+    const prev = productStatsMap.get(s.productoId) ?? {
+      qty: 0,
+      revenueMXN: 0,
+      profitMXN: 0,
+    };
+    productStatsMap.set(s.productoId, {
+      qty: prev.qty + s.cantidad,
+      revenueMXN: prev.revenueMXN + s.ingresoTotalMXN,
+      profitMXN: prev.profitMXN + s.gananciaVentaMXN,
+    });
   });
 
   const topSellingProducts = [...products]
-    .map((p) => ({
-      product: p,
-      qtySold: productSalesMap.get(p.id) || 0,
-    }))
+    .map((p) => {
+      const stats = productStatsMap.get(p.id) ?? {
+        qty: 0,
+        revenueMXN: 0,
+        profitMXN: 0,
+      };
+      return {
+        product: p,
+        qtySold: stats.qty,
+        revenueMXN: stats.revenueMXN,
+        profitMXN: stats.profitMXN,
+      };
+    })
     .filter((item) => item.qtySold > 0)
-    .sort((a, b) => b.qtySold - a.qtySold)
-    .slice(0, 2);
+    .sort((a, b) => b.qtySold - a.qtySold || b.revenueMXN - a.revenueMXN)
+    .slice(0, TOP_LIMIT);
+
+  const topTotals = topSellingProducts.reduce(
+    (acc, item) => ({
+      qty: acc.qty + item.qtySold,
+      revenueMXN: acc.revenueMXN + item.revenueMXN,
+    }),
+    { qty: 0, revenueMXN: 0 }
+  );
+
+  const topMaxQty = topSellingProducts[0]?.qtySold ?? 1;
 
   return (
     <div className="flex flex-col w-full px-4 gap-6 pt-2 pb-8">
@@ -501,135 +519,9 @@ export const InicioView: React.FC<InicioViewProps> = ({
         </div>
       </section>
 
-      {/* Alertas de Stock Dropdown */}
-      <section className="flex flex-col gap-2">
-        <div
-          onClick={() => setIsAlertasOpen(!isAlertasOpen)}
-          className="w-full bg-surface-container border border-outline-variant hover:border-primary/50 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all shadow-sm group"
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <span className="material-symbols-outlined text-base">warning</span>
-            </div>
-            <span className="text-xs font-bold text-on-surface">
-              Alertas de Stock ({outOfStockProducts.length + lowStockProducts.length})
-            </span>
-            {(outOfStockProducts.length > 0 || lowStockProducts.length > 0) && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-error/15 text-error border border-error/30">
-                {outOfStockProducts.length > 0 ? `${outOfStockProducts.length} Agotado(s)` : `${lowStockProducts.length} Stock Bajo`}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onNavigateTab('inventario');
-              }}
-              className="text-[10px] font-bold text-primary hover:underline"
-            >
-              Ver en Inventario
-            </button>
-            <span className="material-symbols-outlined text-on-surface-variant text-lg group-hover:text-primary transition-colors">
-              {isAlertasOpen ? 'expand_less' : 'expand_more'}
-            </span>
-          </div>
-        </div>
-
-        {isAlertasOpen && (
-          <div className="flex flex-col gap-2 pt-1 animate-fade-in">
-            {outOfStockProducts.length === 0 && lowStockProducts.length === 0 ? (
-              <div className="bg-surface-container border border-outline-variant rounded-lg p-3 text-center text-xs text-on-surface-variant">
-                ✓ Todo el inventario tiene stock suficiente
-              </div>
-            ) : (
-              <>
-                {outOfStockProducts.map((p) => (
-                  <div
-                    key={p.id}
-                    onClick={() => onSelectProduct(p.id)}
-                    className="bg-surface-container-lowest border border-error/30 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container transition-colors"
-                  >
-                    <div className="w-10 h-10 rounded-md bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant flex items-center justify-center">
-                      {p.imagen ? (
-                        <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover grayscale opacity-60" imgClassName="w-full h-full object-cover grayscale opacity-60" />
-                      ) : (
-                        <span className="material-symbols-outlined text-on-surface-variant text-lg">
-                          inventory_2
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-xs font-bold text-on-surface truncate">
-                        {p.nombre}
-                      </h3>
-                      <p className="text-[11px] text-error font-bold flex items-center gap-1">
-                        Agotado (0 unidades)
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenCompra(p.id);
-                      }}
-                      title="Reponer stock"
-                      className="px-2.5 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors"
-                    >
-                      Reponer
-                    </button>
-                  </div>
-                ))}
-
-                {lowStockProducts.map((p) => {
-                  const stock = getProductTotalStock(p.id, batches);
-                  return (
-                    <div
-                      key={p.id}
-                      onClick={() => onSelectProduct(p.id)}
-                      className="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-md bg-surface-container overflow-hidden flex-shrink-0 border border-outline-variant flex items-center justify-center">
-                        {p.imagen ? (
-                          <ImagenZoom src={p.imagen} alt={p.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
-                        ) : (
-                          <span className="material-symbols-outlined text-on-surface-variant text-lg">
-                            inventory_2
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-xs font-bold text-on-surface truncate">
-                          {p.nombre}
-                        </h3>
-                        <p className="text-[11px] text-on-surface-variant flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                          Quedan {stock} unidades (mínimo: {p.stockMinimo})
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenCompra(p.id);
-                        }}
-                        className="w-8 h-8 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center text-on-surface hover:text-primary transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">
-                          add_shopping_cart
-                        </span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* Top Productos */}
+      {/* Top Ventas */}
       <section className="flex flex-col gap-3">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-2">
           <h2 className="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
             <span
               className="material-symbols-outlined text-[16px] text-amber-500"
@@ -639,50 +531,154 @@ export const InicioView: React.FC<InicioViewProps> = ({
             </span>
             Top Ventas
           </h2>
+
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/70">
+              Top {TOP_LIMIT} histórico
+            </span>
+            <button
+              type="button"
+              onClick={() => setTopView((v) => (v === 'lista' ? 'grafica' : 'lista'))}
+              title={topView === 'lista' ? 'Ver gráfica de barras' : 'Ver lista detallada'}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors text-[10px] font-bold"
+            >
+              <span className="material-symbols-outlined text-[14px]">
+                {topView === 'lista' ? 'bar_chart' : 'view_list'}
+              </span>
+              {topView === 'lista' ? 'Gráfica' : 'Lista'}
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {topSellingProducts.length === 0 ? (
-            <div className="col-span-2 bg-surface-container border border-outline-variant rounded-lg p-4 text-center text-xs text-on-surface-variant">
-              Aún no se han registrado ventas en el sistema.
-            </div>
-          ) : (
-            topSellingProducts.map((item, index) => {
+        {topSellingProducts.length === 0 ? (
+          <div className="bg-surface-container border border-outline-variant rounded-lg p-4 text-center text-xs text-on-surface-variant">
+            Aún no se han registrado ventas en el sistema.
+          </div>
+        ) : topView === 'lista' ? (
+          <div className="bg-surface-container rounded-xl border border-outline-variant overflow-hidden divide-y divide-outline-variant/40">
+            {topSellingProducts.map((item, index) => {
               const badges = getProductBadges(item.product, batches, sales);
+              const categoria = categories.find(
+                (c) => c.id === item.product.categoriaId
+              );
+
               return (
                 <div
                   key={item.product.id}
                   onClick={() => onSelectProduct(item.product.id)}
-                  className="bg-surface-container rounded-lg border border-outline-variant p-2 flex flex-col gap-2 relative overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelectProduct(item.product.id);
+                    }
+                  }}
+                  className="w-full flex items-center gap-2.5 p-2.5 text-left cursor-pointer hover:bg-surface-container-high/60 transition-colors"
                 >
-                  <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-1.5 py-0.5 rounded text-[10px] font-bold text-on-surface flex items-center gap-1 border border-outline-variant z-10">
-                    #{index + 1}
-                  </div>
-                  <div className="w-full aspect-square rounded-md overflow-hidden bg-surface-container-lowest relative border border-outline-variant flex items-center justify-center">
+                  <span
+                    className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-extrabold ${
+                      index === 0
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : 'bg-surface-container-high text-on-surface-variant'
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+
+                  <div className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-surface-container-lowest border border-outline-variant flex items-center justify-center">
                     {item.product.imagen ? (
-                      <ImagenZoom src={item.product.imagen} alt={item.product.nombre} className="w-full h-full object-cover" imgClassName="w-full h-full object-cover" />
+                      <ImagenZoom
+                        src={item.product.imagen}
+                        alt={item.product.nombre}
+                        className="w-full h-full object-cover"
+                        imgClassName="w-full h-full object-cover"
+                      />
                     ) : (
-                      <span className="material-symbols-outlined text-on-surface-variant text-2xl">
+                      <span className="material-symbols-outlined text-on-surface-variant text-lg">
                         inventory_2
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1">
-                      <h3 className="text-xs font-bold text-on-surface truncate flex-1">
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <h3 className="text-xs font-bold text-on-surface truncate">
                         {item.product.nombre}
                       </h3>
-                      <span className="text-[10px]">{badges.join(' ')}</span>
+                      {badges.length > 0 && (
+                        <span className="text-[10px] shrink-0">{badges.join(' ')}</span>
+                      )}
                     </div>
-                    <span className="text-[10px] text-tertiary font-bold mt-0.5">
-                      {item.qtySold} vendidos
-                    </span>
+                    <p className="text-[10px] text-on-surface-variant truncate">
+                      {categoria?.nombre ?? 'General'} ·{' '}
+                      <strong className="text-tertiary font-bold">
+                        {item.qtySold} vendidos
+                      </strong>
+                    </p>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <p className="text-[11px] font-bold text-on-surface tabular-nums">
+                      {formatMoney(item.revenueMXN, displayCurrency, exchangeRate)}
+                    </p>
+                    <p className="text-[9px] font-bold text-tertiary tabular-nums">
+                      +{formatMoney(item.profitMXN, displayCurrency, exchangeRate)}
+                    </p>
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-background/40 text-[9px] text-on-surface-variant">
+              <span>
+                {topTotals.qty} unidades en el top {topSellingProducts.length}
+              </span>
+              <span className="font-bold text-on-surface tabular-nums">
+                {formatMoney(topTotals.revenueMXN, displayCurrency, exchangeRate)}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-surface-container rounded-xl border border-outline-variant p-3 flex flex-col gap-3">
+            {topSellingProducts.map((item, index) => {
+              const pct = Math.max(
+                6,
+                Math.round((item.qtySold / topMaxQty) * 100)
+              );
+
+              return (
+                <button
+                  key={item.product.id}
+                  type="button"
+                  onClick={() => onSelectProduct(item.product.id)}
+                  className="w-full text-left group"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-on-surface truncate">
+                      <span className="text-on-surface-variant mr-1">#{index + 1}</span>
+                      {item.product.nombre}
+                    </span>
+                    <span className="text-[10px] font-bold text-tertiary shrink-0 tabular-nums">
+                      {item.qtySold} vendidos
+                    </span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-surface-container-high overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary group-hover:bg-primary/80 transition-colors"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-end mt-0.5">
+                    <span className="text-[9px] text-on-surface-variant tabular-nums">
+                      {formatMoney(item.revenueMXN, displayCurrency, exchangeRate)}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* Monthly Financial Calendar Modal */}

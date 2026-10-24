@@ -56,10 +56,15 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
   const productBatches = batches.filter((b) => b.productoId === product.id);
   const activeBatches = productBatches.filter((b) => b.cantidadDisponible > 0);
 
-  // Sales history for this product
-  const productSales = sales.filter(
-    (s) => s.productoId === product.id && s.estado === 'confirmada'
-  );
+  // Sales history for this product (más reciente primero)
+  const productSales = sales
+    .filter((s) => s.productoId === product.id && s.estado === 'confirmada')
+    .sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.fecha || 0).getTime();
+      const timeB = new Date(b.createdAt || b.fecha || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return (b.id || '').localeCompare(a.id || '');
+    });
 
   // Projected Margin % with Suggested Price
   const projectedMarginPct =
@@ -351,8 +356,8 @@ export const DetalleProductoModal: React.FC<DetalleProductoModalProps> = ({
                 Aún no hay ventas registradas para este producto.
               </p>
             ) : (
-              <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                {productSales.slice(0, 5).map((sale) => (
+              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-0.5">
+                {productSales.map((sale) => (
                   <div
                     key={sale.id}
                     className="bg-surface-container border border-outline-variant/40 rounded-lg p-2.5 flex justify-between items-center text-[11px]"
